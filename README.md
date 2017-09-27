@@ -1,2 +1,2 @@
 # AssociationRuleDiscovery
-Discover association rules from a large amount of data based on Spark.
+Discover association rules in distributed big data based on Spark.
