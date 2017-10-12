@@ -28,8 +28,13 @@ object Main {
     println("part1")
     //Apriori.run(sc,"data/sample_fpgrowth.txt","out",minSupport)
     //val data = sc.textFile("data/sample_fpgrowth.txt")
-    val data_D = sc.textFile(args(0), sc.defaultParallelism *4)
-    val data_U = sc.textFile(args(1), sc.defaultParallelism *4)
+    //val data_D = sc.textFile(args(0), sc.defaultParallelism *4)
+    //val data_U = sc.textFile(args(1), sc.defaultParallelism *4)
+    val data = sc.wholeTextFiles(args(0),sc.defaultParallelism*4)
+    val filename =data.keys.collect()
+    val data_D = data.filter(file =>file._1.equals(filename(0))).values
+    val data_U = data.filter(file =>file._1.equals(filename(1))).values
+
     val transactions = data_D.map(x => x.split(" "))
     transactions.cache()
     val fpg = new FPGrowth()
