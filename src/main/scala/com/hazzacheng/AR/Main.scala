@@ -34,15 +34,17 @@ object Main {
     val filename =data.keys.collect()
     val data_D = data.filter(file =>file._1.equals(filename(0))).values
     val data_U = data.filter(file =>file._1.equals(filename(1))).values
-
+    println("part2")
     val transactions = data_D.map(x => x.split(" "))
-    transactions.cache()
+
+
+    //transactions.cache()
     val fpg = new FPGrowth()
       .setMinSupport(minSupport)
       .setNumPartitions(numPartitions)
-
+    println("xxxxx")
     val model = fpg.run(transactions)
-
+    println("yyyyyyyy")
 
     //查看所有的频繁项集，并且列出它出现的次数
     model.freqItemsets.collect().foreach(itemset => {
@@ -51,7 +53,7 @@ object Main {
 
     val rjk = model.generateAssociationRules(minConfidence)
 
-    println("part2")
+    println("part3")
 
     val result = Match.match_U(data_U,model,minConfidence,rjk).map(
       rule => (rule._1.antecedent , List((rule._1.consequent,rule._2))))
