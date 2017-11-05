@@ -11,12 +11,14 @@ object Match {
     //val data = sc.textFile("data/U.dat")
     val tu = data.map(x => x.split(" "))
 
+      println("partx6")
     val t= tu.collect()                     //braodcast
     val ru = rjk.filter{rule => {
          t.contains(rule.antecedent) && !t.contains(rule.consequent)
       }}
-
+      println("partx7")
     val result = cala(t,ru)
+      println("partx8")
     result
   }
 

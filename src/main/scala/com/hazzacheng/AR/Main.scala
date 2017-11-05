@@ -17,7 +17,7 @@ import org.apache.spark.mllib.linalg.Vectors
 
 object Main {
   def main(args: Array[String]) {
-    val conf = new SparkConf().setAppName("FPGrowthTest")
+    val conf = new SparkConf().setAppName("FPGrowthTest").set("spark.driver.maxResultSize","2g")
     //.set("spark.sql.warehouse.dir", "~/ideaWorkspace/ScalaSparkMl/spark-warehouse")
     val sc = new SparkContext(conf)
 
@@ -39,14 +39,12 @@ object Main {
     //val data_D = sc.textFile(,sc.defaultParallelism*4)
     val data_D = data.filter(file => file._1.equals(filename(0))).values
     val data_U = data.filter(file => file._1.equals(filename(1))).values
-    println("part2")
 
-    Kmeans.kmeans(data_D,sumCores,args(1))
-    println("part3")
+    //Kmeans.kmeans(data_D,sumCores,args(1))
 
 
-    //val dataset = data_D.map(line => line.split('\n')).flatMap(item=>item).repartition(sumCores)
-    //val transactions = dataset.map(x => x.split(" ")).cache()
+
+
 
     //    val total = data_D.map(x => x.split(" ")).map(x=>(x.length,x))
 //    val transactions = total.groupByKey().cache()
@@ -62,7 +60,9 @@ object Main {
     //        for (i <- temp)
     //          println(i)
 
-    /*
+
+        val dataset = data_D.map(line => line.split('\n')).flatMap(item=>item).repartition(sumCores)
+        val transactions = dataset.map(x => x.split(" ")).cache()
         val fpg = new FPGrowth()
           .setMinSupport(minSupport)
           .setNumPartitions(sumCores)
@@ -72,25 +72,43 @@ object Main {
 
         println("yyyyyyyy")
 
-        //查看所有的频繁项集，并且列出它出现的次数
-        model.freqItemsets.collect().foreach(itemset => {
-          println(itemset.items.mkString("[", ",", "]") + "," + itemset.freq)
-        })
 
         val rjk = model.generateAssociationRules(minConfidence)
 
-        println("part3")
 
-        val result = Match.match_U(data_U, model, minConfidence, rjk).map(
-          rule => (rule._1.antecedent, List((rule._1.consequent, rule._2))))
-          .reduceByKey(
-            _ ::: _)
-          .map(
-            item => (item._1, item._2.sortWith(_._2 > _._2))
-          ).foreach(
-          res => println(res._1.mkString(",") + "-----" + res._2.head._1 + "------" + res._2.head._2)
-        )
-    */
+        println("partx1")
+
+
+        val dataUset = data_U.map(line => line.split('\n')).flatMap(item=>item).repartition(sumCores)
+        println("partx2")
+        val result = Match.match_U(dataUset, model, minConfidence, rjk)
+        val last =  result.map(
+          rule => (rule._1.antecedent, List(List((rule._1.consequent, rule._2)))))
+
+        println("partx10")
+        val temp =last.reduceByKey(
+          _ ::: _)
+
+        println("partx9")
+//        val t =  temp.map(
+//            item => (item._1, item._2)
+//          ).foreach(
+//          res => println(res._1.mkString(",") + "-----" + res._2.head + "------" + res._2.head)
+//        )
+
+
+        println("partx3")
+
+        //查看所有的频繁项集，并且列出它出现的次数
+        val fre = model.freqItemsets.map(itemset => {
+          val s= itemset.items.mkString("[", ",", "]") + "," + itemset.freq
+          s
+        })
+        println("partx4")
+
+        fre.saveAsTextFile(args(1))
+        println("partx5")
+
 
     //通过置信度筛选出推荐规则则
     //antecedent表示前项
