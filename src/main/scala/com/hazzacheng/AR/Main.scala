@@ -104,6 +104,7 @@ object Main {
           val s= itemset.items.mkString("[", ",", "]") + "," + itemset.freq
           s
         })
+
         println("partx4")
 
         fre.saveAsTextFile(args(1))
