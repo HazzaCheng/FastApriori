@@ -40,7 +40,7 @@ object Preprocess {
     val data_press = transactions.map(item =>
       item.toSet -- broad_drop.value
       ).map(item=>item.toArray)
-    data_press.saveAsTextFile(outputPath)
+    //data_press.saveAsTextFile(outputPath)
 
     data_press
 
