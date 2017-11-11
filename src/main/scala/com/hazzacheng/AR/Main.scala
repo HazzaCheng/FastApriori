@@ -17,7 +17,7 @@ import org.apache.spark.mllib.linalg.Vectors
 
 object Main {
   def main(args: Array[String]) {
-    val conf = new SparkConf().setAppName("FPGrowthTest").set("spark.driver.maxResultSize","2g")
+    val conf = new SparkConf().setAppName("FPGrowthTest")//.set("spark.driver.maxResultSize","2g")
     //.set("spark.sql.warehouse.dir", "~/ideaWorkspace/ScalaSparkMl/spark-warehouse")
     val sc = new SparkContext(conf)
 
@@ -28,7 +28,7 @@ object Main {
     //val partitioner = new HashPartitioner(sumCores * 2)
     val sumCores = sc.defaultParallelism * 4
     println(sumCores)
-    //Apriori.run(sc, args(0), args(1)@Since("1.3.0")
+
     //println("finish")
 
     //val data = sc.textFile("data/sample_fpgrowth.txt")
@@ -40,10 +40,12 @@ object Main {
     val data_D = data.filter(file => file._1.equals(filename(0))).values
     val data_U = data.filter(file => file._1.equals(filename(1))).values
 
+
+    //val transactions = sc.textFile(args(0)).map(_.split(" ")).cache()
     //Kmeans.kmeans(data_D,sumCores,args(1))
-
-
-
+    //Apriori.run(sc, args(0), args(1),minSupport)
+    val pro_data =Preprocess.prepro(sc,data_D,sumCores,minSupport,args(1))
+    val transactions = pro_data.cache()
 
 
     //    val total = data_D.map(x => x.split(" ")).map(x=>(x.length,x))
@@ -61,20 +63,30 @@ object Main {
     //          println(i)
 
 
-        val dataset = data_D.map(line => line.split('\n')).flatMap(item=>item).repartition(sumCores)
-        val transactions = dataset.map(x => x.split(" ")).cache()
+//        val dataset = data_D.map(line => line.split('\n'))
+//          .flatMap(item=>item).repartition(sumCores)
+//        val transactions = dataset.map(x => x.split(" ")).cache()
+//        transactions.first().foreach(println)
+
+
+//        val part_trans = transactions.map(
+//          x=> (x.length/10,List(x.toList))
+//        ).reduceByKey(_:::_)
+
+
         val fpg = new FPGrowth()
           .setMinSupport(minSupport)
           .setNumPartitions(sumCores)
         println("xxxxx")
 
         val model = fpg.run(transactions)
+        //val model = part_trans.map(transsations => fpg.run(transactions))
 
         println("yyyyyyyy")
 
 
         val rjk = model.generateAssociationRules(minConfidence)
-
+        //val rjk = model.map(cluster => cluster.generateAssociationRules(minConfidence))
 
         println("partx1")
 
@@ -83,24 +95,28 @@ object Main {
         println("partx2")
         val result = Match.match_U(dataUset, model, minConfidence, rjk)
         val last =  result.map(
-          rule => (rule._1.antecedent, List(List((rule._1.consequent, rule._2)))))
+          rule => (rule._1.antecedent.mkString(""), List(List((rule._1.consequent, rule._2)))))
 
         println("partx10")
         val temp =last.reduceByKey(
           _ ::: _)
 
         println("partx9")
-//        val t =  temp.map(
-//            item => (item._1, item._2)
-//          ).foreach(
-//          res => println(res._1.mkString(",") + "-----" + res._2.head + "------" + res._2.head)
-//        )
-
+        val t =  temp.map(
+            item => (item._1, item._2)
+          ).map(
+          res => {
+            val s = res._1.mkString(",") + "-----" + res._2.head + "------" + res._2.head
+            s
+          }
+        )
 
         println("partx3")
 
+
         //查看所有的频繁项集，并且列出它出现的次数
-        val fre = model.freqItemsets.map(itemset => {
+        val fre = model.freqItemsets
+          .map(itemset => {
           val s= itemset.items.mkString("[", ",", "]") + "," + itemset.freq
           s
         })
