@@ -10,9 +10,10 @@ object Preprocess {
 
 
     //val datasetx = data.repartition(sumCores).map(line=>line.split('\n'))
-    val dataset = data.map(line => line.split('\n')).flatMap(item=>item).repartition(sumCores)
-    val transactions = dataset.map(x => x.split(" "))
+//    val dataset = data.flatMap(line => line.split('\n'))//.flatMap(item=>item).repartition(sumCores)
+//    val transactions = dataset.map(x => x.split(" ")).repartition(sumCores).cache()
 
+    val transactions = data.map(_.split(" ")).cache()
     val count = transactions.count()
     val minCount = math.ceil(minSupport * count).toLong
     val numPartitions = sumCores
@@ -32,6 +33,10 @@ object Preprocess {
       .flatMap(_._1).map(i =>i.toString)
 
       val set_drop = dropele.collect().toSet
+
+      dropele.foreach(println)
+      println("==============================================================="+minCount)
+
       val broad_drop = sc.broadcast(set_drop)
 
 //    val temp = dropele.collect()

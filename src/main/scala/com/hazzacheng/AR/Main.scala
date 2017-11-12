@@ -32,14 +32,18 @@ object Main {
     //println("finish")
 
     //val data = sc.textFile("data/sample_fpgrowth.txt")
-    //val data_D = sc.textFile(args(0), sc.defaultParallelism *4)
-    //val data_U = sc.textFile(args(1), sc.defaultParallelism *4)
+
+    val path1 = args(0)+"D.dat"
+    val path2 = args(0)+"U.dat"
+    val data_D = sc.textFile(path1, sumCores)
+    val data_U = sc.textFile(path2, sumCores)
+
+    /*
     val data = sc.wholeTextFiles(args(0), sc.defaultParallelism * 4)
     val filename = data.keys.collect()
-    //val data_D = sc.textFile(,sc.defaultParallelism*4)
     val data_D = data.filter(file => file._1.equals(filename(0))).values
     val data_U = data.filter(file => file._1.equals(filename(1))).values
-
+    */
 
     //val transactions = sc.textFile(args(0)).map(_.split(" ")).cache()
     //Kmeans.kmeans(data_D,sumCores,args(1))
@@ -74,10 +78,13 @@ object Main {
 //        ).reduceByKey(_:::_)
 
 
+        //val transactions = data_D.map(_.split(" ")).cache()
         val fpg = new FPGrowth()
           .setMinSupport(minSupport)
           .setNumPartitions(sumCores)
         println("xxxxx")
+
+
 
         val model = fpg.run(transactions)
         //val model = part_trans.map(transsations => fpg.run(transactions))
@@ -147,21 +154,23 @@ object Main {
     //并且所有的规则产生的推荐，后项只有1个，相同的前项产生不同的推荐结果是不同的行
     //不同的规则可能会产生同一个推荐结果，所以样本数据过规则的时候需要去重
 
-    //    println("part3")
-    //    val patterns = ParallelFPGrowth(sc, data_D, minSupport, " ", 5)
-    //    // Print results on the terminal.
-    //    println("part4")
-    //    var count: Int = 0
-    //    for (pattern <- patterns.collect) {
-    //      println(pattern._1 + " " + pattern._2)
-    //      count += 1
-    //    }
-    //    println("---------------------------------------------------------")
-    //    println("count = " + count)
-    //    println("---------------------------------------------------------")
-    //
-    //    //Write elements of patterns as text files in a given directory in hdfs.
-    //    patterns.saveAsTextFile(args(1))
+//        println("part3")
+//
+//        val patterns = ParallelFPGrowth(sc, data_D,
+//          (data_D.count()*minSupport).toLong, " ", sumCores)
+//        // Print results on the terminal.
+//        println("part4")
+//        var count: Int = 0
+//        for (pattern <- patterns.collect) {
+//          println(pattern._1 + " " + pattern._2)
+//          count += 1
+//        }
+//        println("---------------------------------------------------------")
+//        println("count = " + count)
+//        println("---------------------------------------------------------")
+//
+//        //Write elements of patterns as text files in a given directory in hdfs.
+//        patterns.saveAsTextFile(args(1))
 
     // =============parallize================
 
