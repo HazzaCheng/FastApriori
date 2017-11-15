@@ -24,7 +24,7 @@ object FPTree{
     }
 
     //Create FPTree.
-    val fptree = new FPTree(new ArrayBuffer[(String, Long)]())
+    val fptree = new FP_Tree(new ArrayBuffer[(String, Long)]())
 
     //Run FPGrowth.
     fptree.FPGrowth(transactions, new ArrayBuffer[String](), minSupport)
@@ -34,7 +34,7 @@ object FPTree{
   }//End of apply method
 } //End of object FPTree.
 
-class FPTree(var patterns: ArrayBuffer[(String, Long)]){
+class FP_Tree(var patterns: ArrayBuffer[(String, Long)]){
 
   /**
     *

@@ -11,6 +11,7 @@ package com.hazzacheng.AR
   */
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 import org.apache.spark.mllib.fpm.FPGrowth
+import org.apache.spark.mllib.fpm.AssociationRules
 import java.io.{File, PrintWriter}
 
 import org.apache.spark.mllib.linalg.Vectors
@@ -48,8 +49,10 @@ object Main {
     //val transactions = sc.textFile(args(0)).map(_.split(" ")).cache()
     //Kmeans.kmeans(data_D,sumCores,args(1))
     //Apriori.run(sc, args(0), args(1),minSupport)
+
     val pro_data =Preprocess.prepro(sc,data_D,sumCores,minSupport,args(1))
     val transactions = pro_data.cache()
+
 
 
     //    val total = data_D.map(x => x.split(" ")).map(x=>(x.length,x))
@@ -79,6 +82,8 @@ object Main {
 
 
         //val transactions = data_D.map(_.split(" ")).cache()
+
+
         val fpg = new FPGrowth()
           .setMinSupport(minSupport)
           .setNumPartitions(sumCores)
@@ -87,6 +92,7 @@ object Main {
 
 
         val model = fpg.run(transactions)
+
         //val model = part_trans.map(transsations => fpg.run(transactions))
 
         println("yyyyyyyy")
@@ -132,6 +138,28 @@ object Main {
 
         fre.saveAsTextFile(args(1))
         println("partx5")
+
+
+
+/*
+        val parts=model.freqItemsets.partitions
+        print(parts.length+"================")
+        val fre=parts.map(p=>{
+          val idx1 =p.index
+          val partRdd1 =model.freqItemsets.mapPartitionsWithIndex{
+            case (index,value)=>
+              if (index == idx1) value
+              else Iterator()}
+          val dataPartitioned = partRdd1.collect().foreach(
+            itemset =>itemset.items.mkString("[", ",", "]") + "," + itemset.freq
+            )
+          p
+        })
+
+*/
+
+
+
 
 
     //通过置信度筛选出推荐规则则

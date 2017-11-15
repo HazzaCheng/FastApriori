@@ -1,7 +1,8 @@
 package com.hazzacheng.AR
 
-import org.apache.spark.{HashPartitioner, Partitioner, SparkException,SparkContext}
+import org.apache.spark.{HashPartitioner, Partitioner, SparkContext, SparkException}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 
 import scala.reflect.ClassTag
 
@@ -13,7 +14,7 @@ object Preprocess {
 //    val dataset = data.flatMap(line => line.split('\n'))//.flatMap(item=>item).repartition(sumCores)
 //    val transactions = dataset.map(x => x.split(" ")).repartition(sumCores).cache()
 
-    val transactions = data.map(_.split(" ")).cache()
+    val transactions = data.map(_.split(" ")).persist(StorageLevel.MEMORY_AND_DISK_SER)
     val count = transactions.count()
     val minCount = math.ceil(minSupport * count).toLong
     val numPartitions = sumCores
@@ -30,12 +31,14 @@ object Preprocess {
       .reduceByKey(partitioner, _ + _)
       .filter(_._2 < minCount)
       //.collect()
-      .flatMap(_._1).map(i =>i.toString)
+      .map(x=>x._1)
 
       val set_drop = dropele.collect().toSet
 
-      dropele.foreach(println)
-      println("==============================================================="+minCount)
+      println("==============================================================")
+      val num =dropele.count()
+      println("==============================================================="+num)
+
 
       val broad_drop = sc.broadcast(set_drop)
 
@@ -45,7 +48,15 @@ object Preprocess {
     val data_press = transactions.map(item =>
       item.toSet -- broad_drop.value
       ).map(item=>item.toArray)
-    //data_press.saveAsTextFile(outputPath)
+
+    //data_press.map(i => i.mkString(" ")).repartition(1).saveAsTextFile(outputPath)
+
+    //dropele.map(i=>i.mkString(" ")).repartition(1).saveAsTextFile(outputPath)
+
+
+    println(data_press.count())
+
+
 
     data_press
 
