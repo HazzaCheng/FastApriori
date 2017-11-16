@@ -29,35 +29,20 @@ object Preprocess {
       t
     }.map(v => (v, 1L))
       .reduceByKey(partitioner, _ + _)
-      .filter(_._2 < minCount)
-      //.collect()
+      .filter(_._2 > minCount)
       .map(x=>x._1)
 
       val set_drop = dropele.collect().toSet
 
-      println("==============================================================")
-      val num =dropele.count()
-      println("==============================================================="+num)
-
-
       val broad_drop = sc.broadcast(set_drop)
 
-//    val temp = dropele.collect()
-//    temp.foreach(println)
+    val data_press = transactions.map(item =>{
+      val temp =item.toSet.intersect(broad_drop.value)//--broad_drop_odd.value
+      temp
+    }
+    ).map(item=>item.toArray)
 
-    val data_press = transactions.map(item =>
-      item.toSet -- broad_drop.value
-      ).map(item=>item.toArray)
-
-    //data_press.map(i => i.mkString(" ")).repartition(1).saveAsTextFile(outputPath)
-
-    //dropele.map(i=>i.mkString(" ")).repartition(1).saveAsTextFile(outputPath)
-
-
-    println(data_press.count())
-
-
-
+    data_press.count()
     data_press
 
   }

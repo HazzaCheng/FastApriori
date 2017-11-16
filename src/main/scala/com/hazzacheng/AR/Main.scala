@@ -15,6 +15,7 @@ import org.apache.spark.mllib.fpm.AssociationRules
 import java.io.{File, PrintWriter}
 
 import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.storage.StorageLevel
 
 object Main {
   def main(args: Array[String]) {
@@ -34,7 +35,7 @@ object Main {
 
     //val data = sc.textFile("data/sample_fpgrowth.txt")
 
-    val path1 = args(0)+"D.dat"
+    val path1 = args(0)+"part-00000"
     val path2 = args(0)+"U.dat"
     val data_D = sc.textFile(path1, sumCores)
     val data_U = sc.textFile(path2, sumCores)
@@ -51,7 +52,7 @@ object Main {
     //Apriori.run(sc, args(0), args(1),minSupport)
 
     val pro_data =Preprocess.prepro(sc,data_D,sumCores,minSupport,args(1))
-    val transactions = pro_data.cache()
+    val transactions = pro_data.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
 
 
