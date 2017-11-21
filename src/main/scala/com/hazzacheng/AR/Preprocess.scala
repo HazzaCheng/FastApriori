@@ -40,9 +40,14 @@ object Preprocess {
       val temp =item.toSet.intersect(broad_drop.value)//--broad_drop_odd.value
       temp
     }
-    ).map(item=>item.toArray)
+    ).map(v=>(v,1L))
+      .reduceByKey(partitioner,_+_)
+      .filter(_._2==1)
+      .map(x=>x._1)
+      .map(item=>item.toArray)
 
-    data_press.count()
+    //dropele.repartition(1).saveAsTextFile(outputPath)
+    //data_press.repartition(1).saveAsTextFile(outputPath)
     data_press
 
   }

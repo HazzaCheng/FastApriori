@@ -35,7 +35,7 @@ object Main {
 
     //val data = sc.textFile("data/sample_fpgrowth.txt")
 
-    val path1 = args(0)+"part-00000"
+    val path1 = args(0)+"D.dat"
     val path2 = args(0)+"U.dat"
     val data_D = sc.textFile(path1, sumCores)
     val data_U = sc.textFile(path2, sumCores)
