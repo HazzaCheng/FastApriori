@@ -54,6 +54,7 @@ object Main {
     val pro_data =Preprocess.prepro(sc,data_D,sumCores,minSupport,args(1))
     val transactions = pro_data.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
+    //Apriori.run(sc, path1, args(1),minSupport)
 
 
     //    val total = data_D.map(x => x.split(" ")).map(x=>(x.length,x))
@@ -107,7 +108,7 @@ object Main {
 
         val dataUset = data_U.map(line => line.split('\n')).flatMap(item=>item).repartition(sumCores)
         println("partx2")
-        val result = Match.match_U(dataUset, model, minConfidence, rjk)
+        val result = Match.match_U(sc,dataUset, model, minConfidence, rjk)
         val last =  result.map(
           rule => (rule._1.antecedent.mkString(""), List(List((rule._1.consequent, rule._2)))))
 
@@ -126,8 +127,10 @@ object Main {
         )
 
         println("partx3")
+        t.saveAsTextFile(args(1))
 
 
+    /*
         //查看所有的频繁项集，并且列出它出现的次数
         val fre = model.freqItemsets
           .map(itemset => {
@@ -138,6 +141,7 @@ object Main {
         println("partx4")
 
         fre.saveAsTextFile(args(1))
+    */
         println("partx5")
 
 

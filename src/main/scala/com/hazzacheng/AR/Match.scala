@@ -7,18 +7,28 @@ import org.apache.spark.mllib.fpm.{FPGrowth, FPGrowthModel}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.mllib.fpm.AssociationRules
 object Match {
-    def match_U(data: RDD[String], model: FPGrowthModel[String], minConfidence: Double,rjk : RDD[AssociationRules.Rule[String]]): RDD[(AssociationRules.Rule[String], Float)] ={
-    //val data = sc.textFile("data/U.dat")
+    def match_U(sc: SparkContext,data: RDD[String], model: FPGrowthModel[String], minConfidence: Double,rjk : RDD[AssociationRules.Rule[String]]): RDD[(AssociationRules.Rule[String], Float)] ={
     val tu = data.map(x => x.split(" "))
 
       println("partx6")
     val t= tu.collect()                     //braodcast
-    val ru = rjk.filter{rule => {
-         t.contains(rule.antecedent) && !t.contains(rule.consequent)
+    val broad_t =  sc.broadcast(t)
+
+    val pre = broad_t.value.flatten
+    val conse = rjk.map(rule =>(rule,rule.consequent))
+      .filter(rule => !pre.contains(rule._2.mkString("")))
+      .map(x=>x._1)
+
+
+    val ru = conse.filter{rule => {
+         broad_t.value.contains(rule.antecedent)
       }}
+
+
       println("partx7")
     val result = cala(t,ru)
       println("partx8")
+
     result
   }
 
