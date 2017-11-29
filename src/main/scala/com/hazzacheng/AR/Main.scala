@@ -9,11 +9,13 @@ package com.hazzacheng.AR
   * Date: 2017-09-26
   * Time: 10:04 PM
   */
-import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
+import org.apache.spark.{HashPartitioner, SparkConf, SparkContext, mllib}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.mllib.fpm.FPGrowth
 import org.apache.spark.mllib.fpm.AssociationRules
 import java.io.{File, PrintWriter}
 
+import org.apache.spark.mllib.fpm
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.storage.StorageLevel
 
@@ -24,21 +26,39 @@ object Main {
     val sc = new SparkContext(conf)
 
 
+
+
+//    val data = sc.textFile(args(0), sc.defaultParallelism)
+//    val K = 20
+//    val Iteration = 50
+//    val dataset = data.map { line =>
+//      line.trim.split("\t").grouped(2).map(kv => kv(0).toInt -> kv(1).toDouble).toSeq
+//    }
+//    val vectorSize = dataset.map(_.map(_._1).max).max + 1
+//    val vectors = dataset.map { xs =>
+//      Vectors.sparse(vectorSize, xs)
+//    }.cache
+//
+//    val clusters = mlKMeans.train(vectors, K, Iteration)
+//    clusters.predict(vectors).saveAsTextFile(args(1))
+
     val minSupport = 0.092
     val minConfidence = 0.8
     //val sumCores = conf.getInt("spark.executor.cores", 4) * conf.getInt("spark.executor.instances", 12)
     //val partitioner = new HashPartitioner(sumCores * 2)
-    val sumCores = sc.defaultParallelism * 4
+    val sumCores = sc.defaultParallelism * 32
     println(sumCores)
 
     //println("finish")
 
     //val data = sc.textFile("data/sample_fpgrowth.txt")
 
-    val path1 = args(0)+"D.dat"
+    val path1 = args(0)+"part-00000"
     val path2 = args(0)+"U.dat"
     val data_D = sc.textFile(path1, sumCores)
     val data_U = sc.textFile(path2, sumCores)
+    val partitioner = new HashPartitioner(sumCores)
+    val group = 5
 
     /*
     val data = sc.wholeTextFiles(args(0), sc.defaultParallelism * 4)
@@ -51,8 +71,20 @@ object Main {
     //Kmeans.kmeans(data_D,sumCores,args(1))
     //Apriori.run(sc, args(0), args(1),minSupport)
 
+
+//    val len = data_D.map(_.split(" "))
+//      .map(line => line.length)
+//      .map(l => (l, 1L))
+//      .reduceByKey(_+_).repartition(1).sortBy(_._1)
+//    len.saveAsTextFile(args(1))
+
+
+
     val pro_data =Preprocess.prepro(sc,data_D,sumCores,minSupport,args(1))
-    val transactions = pro_data.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    //Kmeans.kmeans(pro_data,sumCores,args(1))
+
+    run_FP.run_FP(minSupport,sumCores,group,pro_data,args(1))
+    println("partx20")
 
     //Apriori.run(sc, path1, args(1),minSupport)
 
@@ -86,11 +118,10 @@ object Main {
         //val transactions = data_D.map(_.split(" ")).cache()
 
 
-        val fpg = new FPGrowth()
-          .setMinSupport(minSupport)
-          .setNumPartitions(sumCores)
-        println("xxxxx")
 
+
+
+/*
 
 
         val model = fpg.run(transactions)
@@ -99,7 +130,7 @@ object Main {
 
         println("yyyyyyyy")
 
-
+/*
         val rjk = model.generateAssociationRules(minConfidence)
         //val rjk = model.map(cluster => cluster.generateAssociationRules(minConfidence))
 
@@ -127,10 +158,10 @@ object Main {
         )
 
         println("partx3")
-        t.saveAsTextFile(args(1))
+        //t.repartition(sumCores).saveAsTextFile(args(1))
 
+*/
 
-    /*
         //查看所有的频繁项集，并且列出它出现的次数
         val fre = model.freqItemsets
           .map(itemset => {
@@ -140,11 +171,22 @@ object Main {
 
         println("partx4")
 
-        fre.saveAsTextFile(args(1))
-    */
+
+        //fre.saveAsTextFile(args(1))
+
         println("partx5")
 
 
+        val freqItemsets =model.freqItemsets
+
+        val ar = new AssociationRules()
+
+        val results = ar
+          .setMinConfidence(0.8)
+          .run(model.freqItemsets)
+          .collect()
+
+*/
 
 /*
         val parts=model.freqItemsets.partitions

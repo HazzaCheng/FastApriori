@@ -17,7 +17,7 @@ object Preprocess {
     val transactions = data.map(_.split(" ")).persist(StorageLevel.MEMORY_AND_DISK_SER)
     val count = transactions.count()
     val minCount = math.ceil(minSupport * count).toLong
-    val numPartitions = sumCores*8
+    val numPartitions = sumCores
     val numParts = if (numPartitions > 0) numPartitions else data.partitions.length
     val partitioner = new HashPartitioner(numParts)
 

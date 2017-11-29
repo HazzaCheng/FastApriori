@@ -6,6 +6,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.mllib.fpm.{FPGrowth, FPGrowthModel}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.mllib.fpm.AssociationRules
+
 object Match {
     def match_U(sc: SparkContext,data: RDD[String], model: FPGrowthModel[String], minConfidence: Double,rjk : RDD[AssociationRules.Rule[String]]): RDD[(AssociationRules.Rule[String], Float)] ={
     val tu = data.map(x => x.split(" "))
