@@ -24,41 +24,18 @@ object Main {
     val conf = new SparkConf().setAppName("FPGrowthTest")//.set("spark.driver.maxResultSize","2g")
     //.set("spark.sql.warehouse.dir", "~/ideaWorkspace/ScalaSparkMl/spark-warehouse")
     val sc = new SparkContext(conf)
-
-
-
-
-//    val data = sc.textFile(args(0), sc.defaultParallelism)
-//    val K = 20
-//    val Iteration = 50
-//    val dataset = data.map { line =>
-//      line.trim.split("\t").grouped(2).map(kv => kv(0).toInt -> kv(1).toDouble).toSeq
-//    }
-//    val vectorSize = dataset.map(_.map(_._1).max).max + 1
-//    val vectors = dataset.map { xs =>
-//      Vectors.sparse(vectorSize, xs)
-//    }.cache
-//
-//    val clusters = mlKMeans.train(vectors, K, Iteration)
-//    clusters.predict(vectors).saveAsTextFile(args(1))
-
     val minSupport = 0.092
     val minConfidence = 0.8
     //val sumCores = conf.getInt("spark.executor.cores", 4) * conf.getInt("spark.executor.instances", 12)
     //val partitioner = new HashPartitioner(sumCores * 2)
     val sumCores = sc.defaultParallelism * 32
     println(sumCores)
-
-    //println("finish")
-
-    //val data = sc.textFile("data/sample_fpgrowth.txt")
-
-    val path1 = args(0)+"part-00000"
+    val path1 = args(0)+"D.dat"
     val path2 = args(0)+"U.dat"
     val data_D = sc.textFile(path1, sumCores)
     val data_U = sc.textFile(path2, sumCores)
     val partitioner = new HashPartitioner(sumCores)
-    val group = 5
+    val group = 6
 
     /*
     val data = sc.wholeTextFiles(args(0), sc.defaultParallelism * 4)
@@ -81,12 +58,12 @@ object Main {
 
 
     val pro_data =Preprocess.prepro(sc,data_D,sumCores,minSupport,args(1))
-    //Kmeans.kmeans(pro_data,sumCores,args(1))
+    val pro_data2 = Kmeans.kmeans(pro_data,sumCores,args(1))
 
-    run_FP.run_FP(minSupport,sumCores,group,pro_data,args(1))
+    //println(pro_data2.count +"xxxxxxxxxxxxxxxxxxxx")
+    run_FP.run_KFP(minSupport,sumCores,group,pro_data2,args(1))
+    //run_FP.run_FP(minSupport,sumCores,group,pro_data,args(1))
     println("partx20")
-
-    //Apriori.run(sc, path1, args(1),minSupport)
 
 
     //    val total = data_D.map(x => x.split(" ")).map(x=>(x.length,x))

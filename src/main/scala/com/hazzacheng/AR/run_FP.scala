@@ -34,4 +34,34 @@ object run_FP {
 
   }
 
+  def run_KFP(minSupport:Double,sumCores:Int,group:Int,
+              dataset: RDD[(Int, List[Array[String]])],outputpath:String): Unit ={
+
+    val transactions = dataset.persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val sum = transactions.count()
+
+    var temp = transactions.filter(_._1 == 0).map(_._2).flatMap(x => x)
+    var temp_sum  =temp.count()
+    var fre = new FPGrowth()
+      .setMinSupport(minSupport*5)
+      .setNumPartitions(sumCores)
+      .run(temp).
+      freqItemsets
+
+    for (i<-1 until group)
+    {
+      var temp = transactions.filter(_._1 == i).map(_._2).flatMap(x => x)
+      var s  = temp.count()
+      var fre_temp = new FPGrowth()
+        .setMinSupport(minSupport*5)
+        .setNumPartitions(sumCores)
+        .run(temp).
+        freqItemsets
+      fre = fre.union(fre_temp)
+    }
+
+    fre.repartition(sumCores).saveAsTextFile(outputpath)
+
+  }
+
 }
