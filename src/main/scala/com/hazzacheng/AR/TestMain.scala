@@ -25,7 +25,7 @@ object TestMain {
 
     val total = dataRDD.count()
     val dataRdd = dataRDD.filter(_.length < len).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val size = dataRDD.count()
+    val size = dataRdd.count()
     val percent = size.toDouble / total.toDouble
     println("==== Size < " + len + " :" + size + " " + percent)
 
