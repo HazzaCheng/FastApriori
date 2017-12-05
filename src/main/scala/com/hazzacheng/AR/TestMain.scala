@@ -3,6 +3,7 @@ package com.hazzacheng.AR
 import com.hazzacheng.AR.utils.RddUtils
 import org.apache.spark.SparkContext
 import org.apache.spark.mllib.fpm.FPGrowth
+import org.apache.spark.storage.StorageLevel
 
 
 /**
@@ -23,7 +24,12 @@ object TestMain {
     val (dataRDD, userRDD) = RddUtils.readAsRDD(sc, input)
 
     val total = dataRDD.count()
-    val freqItems = new FPGrowth().setMinSupport(0.092).run(dataRDD.filter(_.length < len)).freqItemsets.collect()
+    val dataRdd = dataRDD.filter(_.length < len).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    val size = dataRDD.count()
+    val percent = size.toDouble / total.toDouble
+    println("==== Size < " + len + " :" + size + " " + percent)
+
+    val freqItems = new FPGrowth().setMinSupport(0.092).run(dataRdd).freqItemsets.collect()
     val format = freqItems.map(x => (x.items.length, x.freq.toDouble / total.toDouble))
     sc.parallelize(format).saveAsTextFile(output)
   }
