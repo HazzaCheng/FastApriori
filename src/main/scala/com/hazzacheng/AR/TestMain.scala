@@ -31,6 +31,9 @@ object TestMain {
 
     val freqItems = new FPGrowth().setMinSupport(0.092).run(dataRdd).freqItemsets.collect()
     val format = freqItems.map(x => (x.items.length, x.freq.toDouble / total.toDouble))
+
+    println("==== FreqItems Size < " + len + " :" + format.length)
+
     sc.parallelize(format).saveAsTextFile(output)
   }
 }
