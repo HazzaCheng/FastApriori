@@ -19,11 +19,12 @@ object TestMain {
     val sc = new SparkContext()
     val input = args(0)
     val output = args(1)
+    val len = args(2).toInt
     val (dataRDD, userRDD) = RddUtils.readAsRDD(sc, input)
 
     val total = dataRDD.count()
-    val freqItems = new FPGrowth().setMinSupport(0.092).run(dataRDD).freqItemsets.collect()
-    val format = freqItems.map(x => (x.items, x.freq / total))
+    val freqItems = new FPGrowth().setMinSupport(0.092).run(dataRDD.filter(_.length < len)).freqItemsets.collect()
+    val format = freqItems.map(x => (x.items.length, x.freq.toDouble / total.toDouble))
     sc.parallelize(format).saveAsTextFile(output)
   }
 }
