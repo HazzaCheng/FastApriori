@@ -24,16 +24,15 @@ object TestMain {
     val (dataRDD, userRDD) = RddUtils.readAsRDD(sc, input)
 
     val total = dataRDD.count()
-    val dataRdd = dataRDD.filter(_.length < len).persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val size = dataRdd.count()
-    val percent = size.toDouble / total.toDouble
-    println("==== Size < " + len + " :" + size + " " + percent)
+//    val dataRdd = dataRDD.filter(_.length < len).zipWithIndex().filter(_._2 < 100000).map(_._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
+//    val size = dataRdd.count()
+//    val percent = size.toDouble / total.toDouble
+//    println("==== Size < " + len + " :" + size + " " + percent)
 
-    val freqItems = new FPGrowth().setMinSupport(0.092).run(dataRdd).freqItemsets.collect()
-    val format = freqItems.map(x => (x.items.length, x.freq.toDouble / total.toDouble))
+    val freqItems = new FPGrowth().setMinSupport(0.092).run(dataRDD).freqItemsets.collect()
+    val strs = RddUtils.formatOutput(freqItems, total)
+    println("==== FreqItems Size < " + len + " :" + strs.length)
 
-    println("==== FreqItems Size < " + len + " :" + format.length)
-
-    sc.parallelize(format).saveAsTextFile(output)
+    sc.parallelize(strs).saveAsTextFile(output)
   }
 }
