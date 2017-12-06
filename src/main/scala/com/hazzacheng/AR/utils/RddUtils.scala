@@ -19,7 +19,7 @@ object RddUtils {
 
   def readAsRDD(sc: SparkContext,
                 path: String): (RDD[Array[String]], RDD[Array[String]]) = {
-    val dataRDD = sc.textFile(path + "D.dat", sc.defaultParallelism * 4).map(_.trim().split("\\s+"))
+    val dataRDD = sc.textFile(path + "build_data", sc.defaultParallelism * 4).map(_.trim().split("\\s+"))
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
     val userRDD = sc.textFile(path + "U.dat", sc.defaultParallelism * 4).map(_.trim().split("\\s+"))
       .persist(StorageLevel.MEMORY_AND_DISK_SER)

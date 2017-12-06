@@ -23,9 +23,9 @@ object TestMain {
     val len = args(2).toInt
     val (dataRDD, userRDD) = RddUtils.readAsRDD(sc, input)
 
-    val size = dataRDD.count()
-    val newRDD = RddUtils.removeRedundancy(sc, dataRDD, (size * minSupport).toInt)
-    val newSize = newRDD.count()
+    val newSize = dataRDD.count()
+//    val newRDD = RddUtils.removeRedundancy(sc, dataRDD, (size * minSupport).toInt)
+//    val newSize = newRDD.count()
     //newRDD.map(_.mkString(" ")).saveAsTextFile("/RDD")
 
 //    val dataRdd = dataRDD.filter(_.length < len).zipWithIndex().filter(_._2 < 100000).map(_._1).persist(StorageLevel.MEMORY_AND_DISK_SER)
