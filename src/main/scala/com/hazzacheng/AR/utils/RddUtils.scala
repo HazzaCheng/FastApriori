@@ -41,24 +41,33 @@ object RddUtils {
 
   def removeRedundancy(sc: SparkContext,
                        data: RDD[Array[String]],
-                       min: Int): RDD[Array[String]] = {
+                       min: Int
+                      ): (RDD[(Array[String], Long)], Array[String], Array[Int]) = {
     val itemsSet = mutable.HashSet.empty[String]
+    val itemsOrders = mutable.ListBuffer.empty[(String, Int)]
+
     data.flatMap(_.map((_, 1)))
       .reduceByKey(_ + _)
       .filter(_._2 >= min).collect()
-      .foreach(x => itemsSet.add(x._1))
+      .foreach { x =>
+        itemsSet.add(x._1)
+        itemsOrders.append((x._1, x._2))
+      }
+    val oneItemset = itemsOrders.toList.sortBy(_._2).map(_._1).toArray
 
     val size = itemsSet.size
     println("==== items count: " + size)
 
     val itemsBV = sc.broadcast(itemsSet)
-    val newRdd = data.map(x => x.filter(itemsBV.value.contains(_)))
-      .filter(_.nonEmpty)
+    val nonDuplicates = data.map(x => (x.filter(itemsBV.value.contains(_)), 1))
+      .filter(_._1.nonEmpty)
+      .reduceByKey(_ + _)
+      .zipWithIndex()
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
-    val rddSize = newRdd.count()
-    println("==== transaction count: " + rddSize)
+    val countArr = nonDuplicates.map(x => (x._2, x._1._2)).collect().sortBy(_._1).map(_._2)
+    val newRdd = nonDuplicates.map(x => (x._1._1, x._2)).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
-    newRdd
+    (newRdd, oneItemset, countArr)
   }
 
 }
