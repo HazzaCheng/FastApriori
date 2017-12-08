@@ -19,7 +19,7 @@ object RddUtils {
 
   def readAsRDD(sc: SparkContext,
                 path: String): (RDD[Array[String]], RDD[Array[String]]) = {
-    val dataRDD = sc.textFile(path + "build_data", sc.defaultParallelism * 4).map(_.trim().split("\\s+"))
+    val dataRDD = sc.textFile(path + "new.dat", sc.defaultParallelism * 4).map(_.trim().split("\\s+"))
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
     val userRDD = sc.textFile(path + "U.dat", sc.defaultParallelism * 4).map(_.trim().split("\\s+"))
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
@@ -31,9 +31,9 @@ object RddUtils {
                    total: Long): Array[String] = {
     val strs = freqItems.map{x =>
       val percent = x.freq.toDouble / total
-      val str = x.items.mkString("[", ",", "]")
+      val str = x.items.mkString(",")
 
-      str + " ( " + x.freq + " " + percent + " )"
+      str// + " ( " + x.freq + " " + percent + " )"
     }
 
     strs
@@ -42,7 +42,7 @@ object RddUtils {
   def removeRedundancy(sc: SparkContext,
                        data: RDD[Array[String]],
                        min: Int
-                      ): (RDD[(Array[String], Long)], Array[String], Array[Int]) = {
+                      ): (RDD[(Set[String], Long)], Array[String], Array[Int]) = {
     val itemsSet = mutable.HashSet.empty[String]
     val itemsOrders = mutable.ListBuffer.empty[(String, Int)]
 
@@ -59,8 +59,8 @@ object RddUtils {
     println("==== items count: " + size)
 
     val itemsBV = sc.broadcast(itemsSet)
-    val nonDuplicates = data.map(x => (x.filter(itemsBV.value.contains(_)), 1))
-      .filter(_._1.nonEmpty)
+    val nonDuplicates = data.map(x => (x.filter(itemsBV.value.contains(_)).toSet, 1))
+      .filter(_._1.size > 1)
       .reduceByKey(_ + _)
       .zipWithIndex()
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
@@ -69,5 +69,19 @@ object RddUtils {
 
     (newRdd, oneItemset, countArr)
   }
+
+  def getFreqOneItemset(rdd: RDD[(Set[String], Long)],
+                        oneItemset: Array[String],
+                        transSize: Int) = {
+    val oneItemMap = mutable.HashMap.empty[String, Array[Int]]
+    oneItemset.foreach{x =>
+        val indexes = rdd.filter(!_._1.contains(x)).map(_._2.toInt).collect()
+        oneItemMap.put(x, indexes)
+    }
+
+    oneItemMap
+  }
+
+
 
 }
