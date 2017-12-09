@@ -29,14 +29,19 @@ object ARsMine {
     val oneItemMap = RddUtils.getFreqOneItemset(newRdd, oneItemset, transLen)
     val oneItemSetBV = sc.broadcast(oneItemset)
     val oneItemMapBV = sc.broadcast(oneItemMap)
+    val res = mutable.ListBuffer.empty[Array[String]]
     val CandidateItem = mutable.ListBuffer.empty[(Array[String], (Array[Int], Array[Int]))]
     CandidateItem ++= RddUtils.getTwoCandidateItemSet(oneItemset, oneItemMap)
     while(CandidateItem.toList.nonEmpty){
       val candidatesRDD = sc.parallelize(CandidateItem.toList, sc.defaultParallelism * 4)
       CandidateItem.clear()
-      val kFreqItemsInfo = candidatesRDD.map(x => checkCandidateItems(x._1, x._2._1, x._2._2)).filter(_._1).map(x => (x._2, x._3))
-      CandidateItem ++= kFreqItemsInfo.flatMap(x => genCandidateItems(x, oneItemSetBV, oneItemMapBV)).collect().toList.distinct
+      val kFreqItemsInfo = candidatesRDD.map(x => checkCandidateItems(x._1, x._2._1, x._2._2, size.toInt, minSupport)).filter(_._1).map(x => (x._2, x._3))
+      val tempItemsInfo = kFreqItemsInfo.flatMap(x => genCandidateItems(x, oneItemSetBV, oneItemMapBV)).collect().toList
+      val dict = tempItemsInfo.map(x => x._1).distinct.toSet
+      res ++= dict
+      if(dict.size >= dict.head.length + 1)CandidateItem ++= tempItemsInfo.filter(x => dict.contains(x._1))
     }
+
   }
 
   def genCandidateItems(kItems: (Array[String], Array[Int]),
@@ -54,7 +59,9 @@ object ARsMine {
 
   def checkCandidateItems(kItems: Array[String],
                           k_1ItemZeroArray: Array[Int],
-                          oneItemZeroArray: Array[Int]): (Boolean, Array[String], Array[Int]) = {
+                          oneItemZeroArray: Array[Int],
+                          n: Int,
+                          minSupport: Double): (Boolean, Array[String], Array[Int]) = {
 
   }
 }
