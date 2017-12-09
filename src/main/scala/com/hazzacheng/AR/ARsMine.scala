@@ -3,8 +3,10 @@ package com.hazzacheng.AR
 import com.hazzacheng.AR.utils.RddUtils
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+
 import scala.collection.mutable
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.storage.StorageLevel
 
 /**
   * Created with IntelliJ IDEA.
@@ -31,14 +33,15 @@ object ARsMine {
     val oneItemMapBV = sc.broadcast(oneItemMap)
     val res = mutable.ListBuffer.empty[Array[String]]
     val CandidateItem = mutable.ListBuffer.empty[(Array[String], (Array[Int], Array[Int]))]
-    CandidateItem ++= RddUtils.getTwoCandidateItemSet(oneItemset, oneItemMap)
+    CandidateItem ++= RddUtils.getTwoCandidateItemSet(oneItemset, oneItemMap, (size * minSupport).toInt)
     while(CandidateItem.toList.nonEmpty){
       val candidatesRDD = sc.parallelize(CandidateItem.toList, sc.defaultParallelism * 4)
       CandidateItem.clear()
-      val kFreqItemsInfo = candidatesRDD.map(x => checkCandidateItems(x._1, x._2._1, x._2._2, size.toInt, minSupport)).filter(_._1).map(x => (x._2, x._3))
+      val kFreqItemsInfo = candidatesRDD.map(x => checkCandidateItems(x._1, x._2._1, x._2._2, size.toInt, minSupport)).filter(_._1).map(x => (x._2, x._3)).persist(StorageLevel.MEMORY_AND_DISK_SER)
+      val kFreqInfo = kFreqItemsInfo.collect()
+      res ++= kFreqInfo.map(_._1)
       val tempItemsInfo = kFreqItemsInfo.flatMap(x => genCandidateItems(x, oneItemSetBV, oneItemMapBV)).collect().toList
       val dict = tempItemsInfo.map(x => x._1).distinct.toSet
-      res ++= dict
       if(dict.size >= dict.head.length + 1)CandidateItem ++= tempItemsInfo.filter(x => dict.contains(x._1))
     }
 
