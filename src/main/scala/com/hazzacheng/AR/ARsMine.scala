@@ -35,15 +35,21 @@ object ARsMine {
       val candidatesRDD = sc.parallelize(CandidateItem.toList, sc.defaultParallelism * 4)
       CandidateItem.clear()
       val kFreqItemsInfo = candidatesRDD.map(x => checkCandidateItems(x._1, x._2._1, x._2._2)).filter(_._1).map(x => (x._2, x._3))
-      CandidateItem ++= kFreqItemsInfo.map(x => genCandidateItems(x, oneItemSetBV, oneItemMapBV)).collect().toList.distinct
+      CandidateItem ++= kFreqItemsInfo.flatMap(x => genCandidateItems(x, oneItemSetBV, oneItemMapBV)).collect().toList.distinct
     }
   }
 
   def genCandidateItems(kItems: (Array[String], Array[Int]),
                         oneItemSetBV: Broadcast[Array[String]],
-                        oneItemMapBV: Broadcast[mutable.HashMap[String, Array[Int]]]): (Array[String], (Array[Int], Array[Int])) = {
-
-
+                        oneItemMapBV: Broadcast[mutable.HashMap[String, Array[Int]]]): List[(Array[String], (Array[Int], Array[Int]))] = {
+    val itemSet = kItems._1.toSet
+    val CandidateItems = oneItemSetBV.value.filter(!itemSet.contains(_)).map{x =>
+      val CandidateItem = mutable.ArrayBuffer.empty[String]
+      CandidateItem ++= kItems._1
+      CandidateItem += x
+      (CandidateItem.toArray, (kItems._2, oneItemMapBV.value(x)))
+    }
+    CandidateItems.toList
   }
 
   def checkCandidateItems(kItems: Array[String],

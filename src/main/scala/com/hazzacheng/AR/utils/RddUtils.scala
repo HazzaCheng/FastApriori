@@ -84,7 +84,17 @@ object RddUtils {
 
   def getTwoCandidateItemSet(oneItemSet: Array[String],
                              oneItemMap: mutable.HashMap[String, Array[Int]]):List[(Array[String], (Array[Int], Array[Int]))] = {
+    val CandidateItemsInfo = mutable.ListBuffer.empty[(Array[String], (Array[Int], Array[Int]))]
 
+    for(i <- oneItemSet.indices){
+      for(j <- i + 1 until oneItemSet.length){
+        val item = mutable.ArrayBuffer.empty[String]
+        item.append(oneItemSet(i))
+        item.append(oneItemSet(j))
+        CandidateItemsInfo.append((item.toArray,(oneItemMap(oneItemSet(i)), oneItemMap(oneItemSet(j)))))
+      }
+    }
+    CandidateItemsInfo.toList
   }
 
 
