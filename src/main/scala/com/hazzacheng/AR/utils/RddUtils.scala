@@ -82,6 +82,11 @@ object RddUtils {
     oneItemMap
   }
 
+  def getTwoCandidateItemSet(oneItemSet: Array[String],
+                             oneItemMap: mutable.HashMap[String, Array[Int]]):List[(Array[String], (Array[Int], Array[Int]))] = {
+
+  }
+
 
 
 }
