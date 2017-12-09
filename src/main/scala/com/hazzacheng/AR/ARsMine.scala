@@ -62,6 +62,9 @@ object ARsMine {
                           oneItemZeroArray: Array[Int],
                           n: Int,
                           minSupport: Double): (Boolean, Array[String], Array[Int]) = {
-
+    val ans = k_1ItemZeroArray.toSet ++ oneItemZeroArray.toSet
+    val i_arr = mutable.ArrayBuffer.empty[Int]
+    if(ans.size < n * minSupport)(false, kItems, i_arr.toArray)
+    else (true, kItems, ans.toArray)
   }
 }
