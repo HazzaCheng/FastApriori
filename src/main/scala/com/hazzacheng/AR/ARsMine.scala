@@ -45,7 +45,8 @@ object ARsMine {
     // find the k+1 item set
     var k = 2
     while (kItemMap.size >= k) {
-      val candidates = getCandidates(oneItemArrBV, kItemMap.keys.toList, matrixBV, minCount, k - 1)
+      val candidates = getAllCandidates(sc, oneItemArrBV, kItemMap.keys.toList, matrixBV, minCount, k - 1)
+
     }
 
   }
@@ -90,7 +91,7 @@ object ARsMine {
     val len = oneItemArr.size
     val size = countArr.size
     val left = oneItemMap(item)
-    for (i <- (index + 1 until len)) {
+    for (i <- index until len) {
       val exist = new Array[Boolean](size)
       val right = oneItemMap(oneItemArr(i))
       var count = total
@@ -114,13 +115,56 @@ object ARsMine {
     (res, twoItems.toList)
   }
 
-  def getCandidates(oneItemArrBV: Broadcast[Array[String]],
-                    kItems: List[Set[String]],
-                    matrixBV: Broadcast[mutable.HashMap[String, mutable.HashMap[String, Int]]],
-                    minCount: Int,
-                    k: Int): Unit = {
+  def getAllCandidates(sc: SparkContext,
+                       oneItemArrBV: Broadcast[Array[String]],
+                       kItems: List[Set[String]],
+                       matrixBV: Broadcast[mutable.HashMap[String, mutable.HashMap[String, Int]]],
+                       minCount: Int,
+                       k: Int): Array[Set[String]] = {
+    val candidates = sc.parallelize(kItems)
+      .flatMap(x => getCandidates(oneItemArrBV, x, matrixBV, minCount, k))
+      .collect()
+      .distinct
 
+    candidates
   }
 
+  def getCandidates(oneItemArrBV: Broadcast[Array[String]],
+                    items: Set[String],
+                    matrixBV: Broadcast[mutable.HashMap[String, mutable.HashMap[String, Int]]],
+                    minCount: Int,
+                    k: Int): List[Set[String]] = {
+    val oneItemArr = oneItemArrBV.value
+    val matrix = matrixBV.value
+    val iFirst = findIFirst(oneItemArr, items)
+    val iLast = findILast(oneItemArr, items)
+    val res = mutable.ListBuffer.empty[Set[String]]
+
+    for (i <- 0 until iLast) {
+      val vw = matrix(oneItemArr(iLast))
+        .getOrElse(oneItemArr(i), matrix(oneItemArr(i)).getOrElse(oneItemArr(iLast), 0))
+      val uw = matrix(oneItemArr(iFirst))
+        .getOrElse(oneItemArr(i), matrix(oneItemArr(i)).getOrElse(oneItemArr(iFirst), 0))
+      if (vw >= minCount && uw >= minCount && vw >= k && !items.contains(oneItemArr(i)))
+        res.append(items + oneItemArr(i))
+    }
+
+    res.toList
+  }
+
+
+  def findIFirst(oneItemArr: Array[String], items: Set[String]): Int = {
+    val len = oneItemArr.length
+    for (i <- 0 until len)
+      if (items contains oneItemArr(i)) return i
+    0
+  }
+
+  def findILast(oneItemArr: Array[String], items: Set[String]): Int = {
+    val len = oneItemArr.length
+    for (i <- 0 until len)
+      if (items contains oneItemArr(len - 1 - i)) return len - 1 - i
+    len - 1
+  }
 
 }
