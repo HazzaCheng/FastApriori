@@ -25,32 +25,29 @@ object ARsMine {
     val size = dataRDD.count()
     val (newRdd, oneItemset, countArr) = RddUtils.removeRedundancy(sc, dataRDD, (size * minSupport).toInt)
     // get the one item frequent set
-    // get the one item frequent set
     val itemsLen = oneItemset.length
     val transLen = countArr.length
     val oneItemMap = RddUtils.getFreqOneItemset(newRdd, oneItemset, size.toInt)
     val oneItemSetBV = sc.broadcast(oneItemset)
     val oneItemMapBV = sc.broadcast(oneItemMap)
     val res = mutable.ListBuffer.empty[Array[String]]
-    val CandidateItem = mutable.ListBuffer.empty[(Array[String], (Array[Boolean], Array[Boolean]))]
+    val candidateItems = mutable.ListBuffer.empty[(Array[String], (Array[Boolean], Array[Boolean]))]
 
-    //生成长度为size，全为true的Array备用
-    val raw_1_Arr = mutable.ArrayBuffer.empty[Boolean]
-    for(i <- 0 until size.toInt) raw_1_Arr.append(true)
+    // create the array which saves true in the size of translen
+    val wholeTrans = new Array[Boolean](transLen)
+    Range(0, transLen).foreach(wholeTrans(_) = true)
 
+    // create the k-item set
+    val kItemMap = mutable.HashMap.empty[mutable.Set[String], Array[Int]]
+    oneItemMap.toList.foreach(x => kItemMap.put(mutable.Set(x._1), x._2))
 
-    CandidateItem ++= RddUtils.getTwoCandidateItemSet(oneItemset, oneItemMap, (size * minSupport).toInt, raw_1_Arr.toArray)
-    while(CandidateItem.toList.nonEmpty){
-      val candidatesRDD = sc.parallelize(CandidateItem.toList, sc.defaultParallelism * 4)
-      CandidateItem.clear()
-
-      val kFreqItemsInfo = candidatesRDD.map(x => checkCandidateItems(x._1, x._2._1, x._2._2, size.toInt, minSupport)).filter(_._1).map(x => (x._2, x._3)).persist(StorageLevel.MEMORY_AND_DISK_SER)
-      val kFreqInfo = kFreqItemsInfo.collect()
-      res ++= kFreqInfo.map(_._1)
-      val tempItemsInfo = kFreqItemsInfo.flatMap(x => genCandidateItems(x, oneItemSetBV, oneItemMapBV, raw_1_Arr.toArray)).collect().toList
-      val dict = tempItemsInfo.map(x => x._1).distinct.toSet
-      if(dict.size >= dict.head.length + 1)CandidateItem ++= tempItemsInfo.filter(x => dict.contains(x._1))
+    // find the k+1 item set
+    var k = 2
+    while (kItemMap.size >= k) {
+      val candidates =
     }
+
+
 
   }
 

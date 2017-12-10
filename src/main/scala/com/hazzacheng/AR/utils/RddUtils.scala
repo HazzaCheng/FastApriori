@@ -73,7 +73,7 @@ object RddUtils {
 
   def getFreqOneItemset(rdd: RDD[(Set[String], Long)],
                         oneItemset: Array[String],
-                        size: Int) = {
+                        size: Int): mutable.HashMap[String, Array[Int]] = {
     val oneItemMap = mutable.HashMap.empty[String, Array[Int]]
     oneItemset.foreach{x =>
       val indexes = rdd.filter(!_._1.contains(x)).map(_._2.toInt).collect()
