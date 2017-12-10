@@ -6,6 +6,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 /**
   * Created with IntelliJ IDEA.
@@ -72,20 +73,25 @@ object RddUtils {
 
   def getFreqOneItemset(rdd: RDD[(Set[String], Long)],
                         oneItemset: Array[String],
-                        transSize: Int) = {
+                        size: Int) = {
     val oneItemMap = mutable.HashMap.empty[String, Array[Int]]
     oneItemset.foreach{x =>
-        val indexes = rdd.filter(!_._1.contains(x)).map(_._2.toInt).collect()
-        oneItemMap.put(x, indexes)
+      val indexes = rdd.filter(!_._1.contains(x)).map(_._2.toInt).collect()
+//      val bool_Arr = mutable.ArrayBuffer.empty[Boolean]
+//      for(i <- 0 until size) bool_Arr.append(true)
+//      for(i <- indexes.indices) bool_Arr(indexes(i)) = false
+      oneItemMap.put(x, indexes)
     }
+
 
     oneItemMap
   }
 
   def getTwoCandidateItemSet(oneItemSet: Array[String],
                              oneItemMap: mutable.HashMap[String, Array[Int]],
-                             count: Int):List[(Array[String], (Array[Int], Array[Int]))] = {
-    val CandidateItemsInfo = mutable.ListBuffer.empty[(Array[String], (Array[Int], Array[Int]))]
+                             count: Int,
+                             raw_1_Arr: Array[Boolean]):List[(Array[String], (Array[Boolean], Array[Boolean]))] = {
+    val CandidateItemsInfo = mutable.ListBuffer.empty[(Array[String], (Array[Boolean], Array[Boolean]))]
     val u = oneItemSet.head
     val v = oneItemSet.last
     for(i <- oneItemSet.indices){
@@ -93,7 +99,14 @@ object RddUtils {
         val newItems = mutable.ArrayBuffer.empty[String]
         newItems.append(oneItemSet(i))
         newItems.append(oneItemSet(w))
-        CandidateItemsInfo.append((newItems.toArray, (oneItemMap(oneItemSet(i)), oneItemMap(oneItemSet(w)))))
+        val mi = oneItemMap(oneItemSet(i))
+        val i_arr = raw_1_Arr
+        val mw = oneItemMap(oneItemSet(w))
+        val w_arr = raw_1_Arr
+
+        for(i <- mi.indices) i_arr(mi(i)) = false
+        for(i <- mw.indices) w_arr(mi(i)) = false
+        CandidateItemsInfo.append((newItems.toArray, (i_arr, w_arr)))
 
       }
     }

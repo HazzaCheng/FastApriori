@@ -15,6 +15,7 @@ import org.apache.spark.SparkContext
 object TestMain {
 
   def main(args: Array[String]): Unit = {
+    //test.ABC()
     val sc = new SparkContext()
     val input = args(0)
     val output = args(1)
