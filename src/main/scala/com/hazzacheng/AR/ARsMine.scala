@@ -4,6 +4,7 @@ import com.hazzacheng.AR.utils.RddUtils
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable
 
@@ -17,12 +18,14 @@ import scala.collection.mutable
   */
 object ARsMine {
   def findOnSpark(sc: SparkContext,
+                  outputPath: String,
                   dataRDD: RDD[Array[String]],
                   userRDD: RDD[Array[String]],
-                  minSupport: Double): Unit = {
+                  minSupport: Double) = {
+    val freqItems = mutable.ListBuffer.empty[Set[String]]
     // remove the items whose frequency is fewer than minimum support
     val total = dataRDD.count().toInt
-    val (newRdd, oneItemArr, countArr) = RddUtils.removeRedundancy(sc, dataRDD, (total * minSupport).toInt)
+    val (newRdd, oneItemArr, countArr, oneItemCountMap) = RddUtils.removeRedundancy(sc, dataRDD, (total * minSupport).toInt)
     // get the one item frequent set
     val itemsLen = oneItemArr.length
     val transLen = countArr.length
@@ -45,10 +48,15 @@ object ARsMine {
     // find the k+1 item set
     var k = 2
     while (kItemMap.size >= k) {
-      val candidates = getAllCandidates(sc, oneItemArrBV, kItemMap.keys.toList, matrixBV, minCount, k - 1)
-
+      val kItems = kItemMap.keys.toList
+      freqItems ++= kItems
+      val candidates = getAllCandidates(sc, oneItemArrBV, kItems, matrixBV, minCount, k - 1)
+      checkCandidates(sc, countArrBV, minCount, total, transLen, candidates, kItemMap)
+      candidates.unpersist()
     }
 
+    // output the frequent items
+    RddUtils.formattedSave(sc, outputPath, freqItems.toList, oneItemCountMap)
   }
 
   def getMatrix(sc: SparkContext,
@@ -120,11 +128,12 @@ object ARsMine {
                        kItems: List[Set[String]],
                        matrixBV: Broadcast[mutable.HashMap[String, mutable.HashMap[String, Int]]],
                        minCount: Int,
-                       k: Int): Array[Set[String]] = {
+                       k: Int) = {
     val candidates = sc.parallelize(kItems)
       .flatMap(x => getCandidates(oneItemArrBV, x, matrixBV, minCount, k))
-      .collect()
+//      .collect()
       .distinct
+      .persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     candidates
   }
@@ -165,6 +174,53 @@ object ARsMine {
     for (i <- 0 until len)
       if (items contains oneItemArr(len - 1 - i)) return len - 1 - i
     len - 1
+  }
+
+  def checkCandidates(sc: SparkContext,
+                      countArrBV: Broadcast[Array[Int]],
+                      minCount: Int,
+                      total: Int,
+                      translen: Int,
+                      candidates: RDD[Set[String]],
+                      kItemMap: mutable.HashMap[Set[String], Array[Boolean]]) = {
+    val kItemMapBV = sc.broadcast(kItemMap)
+    val res = candidates.map(x => checkEach(kItemMapBV, countArrBV, minCount, total, translen, x))
+      .filter(_._1.nonEmpty)
+      .collect()
+    kItemMapBV.unpersist()
+    kItemMap.clear()
+    kItemMap ++= res
+  }
+
+  def checkEach(kItemMapBV: Broadcast[mutable.HashMap[Set[String], Array[Boolean]]],
+                countArrBV: Broadcast[Array[Int]],
+                minCount: Int,
+                total: Int,
+                transLen: Int,
+                candidate: Set[String]): (Set[String], Array[Boolean]) = {
+    val kItemMap = kItemMapBV.value
+    val countArr = countArrBV.value
+    val subSets = getSubsets(candidate)
+    for (s <- subSets)
+      if (subSets.contains(s)) return (Set.empty[String], Array.empty[Boolean])
+    val x = kItemMap(subSets.head)
+    val y = kItemMap(subSets.last)
+    var count = total
+    val exist = new Array[Boolean](transLen)
+    for (i <- 0 until transLen) {
+      exist(i) = x(i) && y(i)
+      if (!exist(i)) count -= countArr(i)
+      return (Set.empty[String], Array.empty[Boolean])
+    }
+
+    (candidate, exist)
+  }
+
+  def getSubsets(candidate: Set[String]): List[Set[String]] = {
+    val len = candidate.size
+    val subSets = candidate.toList.map(candidate - _)
+
+    subSets
   }
 
 }
