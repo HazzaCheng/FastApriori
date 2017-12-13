@@ -61,13 +61,13 @@ object ARsMine {
 
   def getMatrix(sc: SparkContext,
                 oneItemArrBV: Broadcast[Array[String]],
-                oneItemMapBV: Broadcast[mutable.HashMap[String, Array[Boolean]]],
+                oneItemMapBV: Broadcast[mutable.HashMap[String, Set[Int]]],
                 countArrBV: Broadcast[Array[Int]],
                 total: Int,
                 minCount: Int
-               ): (mutable.HashMap[String, mutable.HashMap[String, Int]], mutable.HashMap[Set[String], Array[Boolean]]) = {
+               ): (mutable.HashMap[String, mutable.HashMap[String, Int]], mutable.HashMap[Set[String], Set[Int]]) = {
     val matrix = mutable.HashMap.empty[String, mutable.HashMap[String, Int]]
-    val twoItemsMap = mutable.HashMap.empty[Set[String], Array[Boolean]]
+    val twoItemsMap = mutable.HashMap.empty[Set[String], Set[Int]]
 
     val res = sc.parallelize(oneItemArrBV.value.zipWithIndex).map{x =>
       val (line, twoItemsMap) = getTwoCount(x._1, x._2, oneItemArrBV, oneItemMapBV, countArrBV, total, minCount)
@@ -85,42 +85,38 @@ object ARsMine {
   def getTwoCount(item: String,
                   index: Int,
                   oneItemArrBV: Broadcast[Array[String]],
-                  oneItemMapBV: Broadcast[mutable.HashMap[String, Array[Boolean]]],
+                  oneItemMapBV: Broadcast[mutable.HashMap[String, Set[Int]]],
                   countArrBV: Broadcast[Array[Int]],
                   total: Int,
                   minCount: Int
-                 ): (mutable.HashMap[String, Int], List[(Set[String], Array[Boolean])]) = {
+                 ): (mutable.HashMap[String, Int], List[(Set[String], Set[Int])]) = {
     val oneItemArr = oneItemArrBV.value
     val oneItemMap = oneItemMapBV.value
     val countArr = countArrBV.value
     val res = mutable.HashMap.empty[String, Int]
-    val twoItems = mutable.ListBuffer.empty[(Set[String], Array[Boolean])]
+    val twoItems = mutable.ListBuffer.empty[(Set[String], Set[Int])]
 
     val len = oneItemArr.size
     val size = countArr.size
     val left = oneItemMap(item)
     for (i <- index until len) {
-      val exist = new Array[Boolean](size)
       val right = oneItemMap(oneItemArr(i))
-      var count = total
-      var j = 0
-      var flag = true
-      while (flag && j < size) {
-        exist(j) = left(j) && right(j)
-        if (!exist(j)) count -= countArr(j)
-        if (count < minCount) {
-          flag = false
-          res.put(oneItemArr(i), 0)
-        }
-        j += 1
-      }
-      if (flag) {
-        res.put(oneItemArr(i), count)
-        twoItems.append((Set(item, oneItemArr(i)), exist))
+      val common = left & right
+      val count = getSupport(common, countArr)
+      res.put(oneItemArr(i), count)
+      if (count >= minCount) {
+        twoItems.append((Set(item, oneItemArr(i)), common))
       }
     }
 
     (res, twoItems.toList)
+  }
+
+  def getSupport(common: Set[Int], countArr: Array[Int]): Int = {
+    var count = 0
+    common.toList.foreach(count += countArr(_))
+
+    count
   }
 
   def getAllCandidates(sc: SparkContext,
@@ -134,6 +130,8 @@ object ARsMine {
 //      .collect()
       .distinct
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    // TODO: local vs rdd
 
     candidates
   }
@@ -182,7 +180,7 @@ object ARsMine {
                       total: Int,
                       translen: Int,
                       candidates: RDD[Set[String]],
-                      kItemMap: mutable.HashMap[Set[String], Array[Boolean]]) = {
+                      kItemMap: mutable.HashMap[Set[String], Set[Int]]) = {
     val kItemMapBV = sc.broadcast(kItemMap)
     val res = candidates.map(x => checkEach(kItemMapBV, countArrBV, minCount, total, translen, x))
       .filter(_._1.nonEmpty)
@@ -192,28 +190,26 @@ object ARsMine {
     kItemMap ++= res
   }
 
-  def checkEach(kItemMapBV: Broadcast[mutable.HashMap[Set[String], Array[Boolean]]],
+  def checkEach(kItemMapBV: Broadcast[mutable.HashMap[Set[String], Set[Int]]],
                 countArrBV: Broadcast[Array[Int]],
                 minCount: Int,
                 total: Int,
                 transLen: Int,
-                candidate: Set[String]): (Set[String], Array[Boolean]) = {
+                candidate: Set[String]): (Set[String], Set[Int]) = {
+    val empty = (Set.empty[String], Set.empty[Int])
     val kItemMap = kItemMapBV.value
     val countArr = countArrBV.value
     val subSets = getSubsets(candidate)
     for (s <- subSets)
-      if (subSets.contains(s)) return (Set.empty[String], Array.empty[Boolean])
+      if (subSets.contains(s)) return empty
     val x = kItemMap(subSets.head)
     val y = kItemMap(subSets.last)
-    var count = total
-    val exist = new Array[Boolean](transLen)
-    for (i <- 0 until transLen) {
-      exist(i) = x(i) && y(i)
-      if (!exist(i)) count -= countArr(i)
-      return (Set.empty[String], Array.empty[Boolean])
-    }
+    val common = x & y
+    val count = getSupport(common, countArr)
+    if (count < minCount) return empty
 
-    (candidate, exist)
+
+    (candidate, common)
   }
 
   def getSubsets(candidate: Set[String]): List[Set[String]] = {

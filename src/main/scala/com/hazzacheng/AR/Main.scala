@@ -15,8 +15,8 @@ import org.apache.spark.{SparkConf, SparkContext}
 object Main {
 
   def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().set("spark.Kryoserializer.buffer.max","1024m")
-    val sc = new SparkContext(conf)
+    //val conf = new SparkConf().set("spark.Kryoserializer.buffer.max","1024m")
+    val sc = new SparkContext()
     val input = args(0)
     val output = args(1)
     val minSupport = 0.092

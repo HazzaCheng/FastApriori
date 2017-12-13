@@ -82,13 +82,11 @@ object RddUtils {
   def getFreqOneItemset(rdd: RDD[(Set[String], Long)],
                         oneItemset: Array[String],
                         transLen: Int
-                       ): mutable.HashMap[String, Array[Boolean]] = {
-    val oneItemMap = mutable.HashMap.empty[String, Array[Boolean]]
+                       ): mutable.HashMap[String, Set[Int]] = {
+    val oneItemMap = mutable.HashMap.empty[String, Set[Int]]
     oneItemset.foreach{x =>
-      val exist = new Array[Boolean](transLen)
       val indexes = rdd.filter(_._1.contains(x)).map(_._2.toInt).collect()
-      indexes.foreach(exist(_) = true)
-      oneItemMap.put(x, exist)
+      oneItemMap.put(x, indexes.toSet)
     }
 
     oneItemMap
