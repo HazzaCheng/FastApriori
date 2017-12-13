@@ -30,13 +30,14 @@ object Main {
     //val partitioner = new HashPartitioner(sumCores * 2)
     val sumCores = sc.defaultParallelism * 32
     println(sumCores)
-    val path1 = args(0)+"D.dat"
+    val path1 = args(0)+"new.dat"
     val path2 = args(0)+"U.dat"
     val data_D = sc.textFile(path1, sumCores)
     val data_U = sc.textFile(path2, sumCores)
     val partitioner = new HashPartitioner(sumCores)
     val group = 6
 
+    //val transactions = data_D.map(_.split(" "))
     /*
     val data = sc.wholeTextFiles(args(0), sc.defaultParallelism * 4)
     val filename = data.keys.collect()
@@ -58,10 +59,10 @@ object Main {
 
 
     val pro_data =Preprocess.prepro(sc,data_D,sumCores,minSupport,args(1))
-    val pro_data2 = Kmeans.kmeans(pro_data,sumCores,args(1))
+    //val pro_data2 = Kmeans.kmeans(pro_data,sumCores,args(1))
 
     //println(pro_data2.count +"xxxxxxxxxxxxxxxxxxxx")
-    run_FP.run_KFP(minSupport,sumCores,group,pro_data2,args(1))
+    run_FP.run_FP(minSupport,sumCores,group,pro_data,args(1))
     //run_FP.run_FP(minSupport,sumCores,group,pro_data,args(1))
     println("partx20")
 

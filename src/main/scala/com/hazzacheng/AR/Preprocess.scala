@@ -39,11 +39,12 @@ object Preprocess {
     val data_press = transactions.map(item =>{
       val temp =item.toSet.intersect(broad_drop.value)//--broad_drop_odd.value
       temp
-    }
-    ).map(v=> (v, 1L))
+    })
+      .map(v=> (v, 1L))
       .reduceByKey(partitioner,_+_)
       .filter(_._2==1)
-      .map(x=>x._1).map(x => (x,x.size))
+      .map(x=>x._1)
+      .map(x => (x,x.size))
       .filter(_._2 <= 57)
       .map(x =>x._1)//.sortBy(_.head)
       .map(item=>item.toArray)
