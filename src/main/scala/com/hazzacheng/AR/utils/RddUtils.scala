@@ -69,7 +69,7 @@ object RddUtils {
 
     val itemsBV = sc.broadcast(itemsSet)
     val nonDuplicates = data.map(x => (x.filter(itemsBV.value.contains(_)).toSet, 1))
-      .filter(_._1.size > 1)
+      .filter(x => x._1.size > 1 && x._1.size < 100)
       .reduceByKey(_ + _)
       .zipWithIndex()
       .persist(StorageLevel.MEMORY_AND_DISK_SER)

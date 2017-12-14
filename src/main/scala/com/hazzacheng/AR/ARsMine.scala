@@ -42,10 +42,6 @@ object ARsMine {
     val oneItemArrBV = sc.broadcast(oneItemArr)
     val minCount = (total * minSupport).toInt
 
-    // create the array which saves true in the size of translen
-    val wholeTrans = new Array[Boolean](transLen)
-    Range(0, transLen).foreach(wholeTrans(_) = true)
-
     // create the two items matrix and get the k-item set
     val (matrix, kItemMap) = getMatrix(sc, oneItemArrBV, oneItemMapBV, countArrBV, minCount)
 //    val time = System.currentTimeMillis()
@@ -56,9 +52,12 @@ object ARsMine {
     // find the k+1 item set
     var k = 3
     while (kItemMap.size >= k) {
+      println("==== loop " + k)
       val kItems = kItemMap.keys.toList
       freqItems ++= kItems
       val candidates = getAllCandidates(sc, oneItemArrBV, kItems, matrixBV, minCount, k - 1)
+      val candSize = candidates.count()
+      println("==== candidates " + candSize)
       checkCandidates(sc, countArrBV, minCount, candidates, kItemMap)
       candidates.unpersist()
       k += 1

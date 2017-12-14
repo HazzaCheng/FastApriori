@@ -9,15 +9,7 @@ package com.hazzacheng.AR
   * Date: 2017-09-26
   * Time: 10:04 PM
   */
-import org.apache.spark.{HashPartitioner, SparkConf, SparkContext, mllib}
-import org.apache.spark.rdd.RDD
-import org.apache.spark.mllib.fpm.FPGrowth
-import org.apache.spark.mllib.fpm.AssociationRules
-import java.io.{File, PrintWriter}
-
-import org.apache.spark.mllib.fpm
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.storage.StorageLevel
+import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 
 object Main {
   def main(args: Array[String]) {
