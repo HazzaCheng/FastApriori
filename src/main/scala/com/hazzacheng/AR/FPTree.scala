@@ -3,20 +3,16 @@ package com.hazzacheng.AR
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-/**
-  * FP-Tree data structure used in FP-Growth.
-  * @tparam T item type
-  */
-class new_FPTree[T] extends Serializable {
+class FPTree extends Serializable {
 
-  import new_FPTree._
+  import FPTree._
 
-  val root: Node[T] = new Node(null)
+  val root: Node = new Node(null)
 
-  private val summaries: mutable.Map[T, Summary[T]] = mutable.Map.empty
+  private val summaries = mutable.HashMap.empty[Int, Summary]
 
   /** Adds a transaction with count. */
-  def add(t: Iterable[T], count: Long = 1L): this.type = {
+  def add(t: Iterable[Int], count: Int = 1): this.type = {
     require(count > 0)
     var curr = root
     curr.count += count
@@ -36,7 +32,7 @@ class new_FPTree[T] extends Serializable {
   }
 
   /** Merges another FP-Tree. */
-  def merge(other: new_FPTree[T]): this.type = {
+  def merge(other: FPTree): this.type = {
     other.transactions.foreach { case (t, c) =>
       add(t, c)
     }
@@ -44,12 +40,12 @@ class new_FPTree[T] extends Serializable {
   }
 
   /** Gets a subtree with the suffix. */
-  private def project(suffix: T): new_FPTree[T] = {
-    val tree = new new_FPTree[T]
+  private def project(suffix: Int): FPTree = {
+    val tree = new FPTree
     if (summaries.contains(suffix)) {
       val summary = summaries(suffix)
       summary.nodes.foreach { node =>
-        var t = List.empty[T]
+        var t = List.empty[Int]
         var curr = node.parent
         while (!curr.isRoot) {
           t = curr.item :: t
@@ -62,10 +58,10 @@ class new_FPTree[T] extends Serializable {
   }
 
   /** Returns all transactions in an iterator. */
-  def transactions: Iterator[(List[T], Long)] = getTransactions(root)
+  def transactions: Iterator[(List[Int], Int)] = getTransactions(root)
 
   /** Returns all transactions under this node. */
-  private def getTransactions(node: Node[T]): Iterator[(List[T], Long)] = {
+  private def getTransactions(node: Node): Iterator[(List[Int], Int)] = {
     var count = node.count
     node.children.iterator.flatMap { case (item, child) =>
       getTransactions(child).map { case (t, c) =>
@@ -83,8 +79,9 @@ class new_FPTree[T] extends Serializable {
 
   /** Extracts all patterns with valid suffix and minimum count. */
   def extract(
-               minCount: Long,
-               validateSuffix: T => Boolean = _ => true): Iterator[(List[T], Long)] = {
+               minCount: Int,
+               validateSuffix: Int => Boolean = _ => true
+             ): Iterator[(List[Int], Int)] = {
     summaries.iterator.flatMap { case (item, summary) =>
       if (validateSuffix(item) && summary.count >= minCount) {
         Iterator.single((item :: Nil, summary.count)) ++
@@ -96,20 +93,23 @@ class new_FPTree[T] extends Serializable {
       }
     }
   }
+
 }
 
-object new_FPTree {
+object FPTree {
+
   /** Representing a node in an FP-Tree. */
-  class Node[T](val parent: Node[T]) extends Serializable {
-    var item: T = _
-    var count: Long = 0L
-    val children: mutable.Map[T, Node[T]] = mutable.Map.empty
+  class Node(val parent: Node) extends Serializable {
+    var item: Int = _
+    var count: Int = 0
+    val children = mutable.Map.empty[Int, Node]
 
     def isRoot: Boolean = parent == null
   }
+
   /** Summary of an item in an FP-Tree. */
-  private class Summary[T] extends Serializable {
-    var count: Long = 0L
-    val nodes: ListBuffer[Node[T]] = ListBuffer.empty
+  private class Summary extends Serializable {
+    var count: Int = 0
+    val nodes = ListBuffer.empty[Node]
   }
 }

@@ -41,10 +41,13 @@ object RddUtils {
 
   def formattedSave(sc: SparkContext,
                     path: String,
-                    freqItems: List[Set[String]],
-                    oneItemCountMap: Map[String, Int]): Unit = {
-    val strs = freqItems.map(_.toList.sortBy(oneItemCountMap(_)).mkString(" "))
-    sc.parallelize(strs).saveAsTextFile(path)
+                    freqItemsets: RDD[(Array[String], Int)],
+                    itemToRank: mutable.HashMap[String, Int]): Unit = {
+    val itemToRankBV = sc.broadcast(itemToRank)
+    freqItemsets.map{x =>
+      val itemToRank = itemToRankBV.value
+      x._1.sortBy(itemToRank(_)).mkString(" ")
+    }.saveAsTextFile(path)
   }
 
   def removeRedundancy(sc: SparkContext,

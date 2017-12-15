@@ -64,7 +64,7 @@ object ARsMine {
     }
 
     // output the frequent items
-    RddUtils.formattedSave(sc, outputPath, freqItems.toList, oneItemCountMap)
+//    RddUtils.formattedSave(sc, outputPath, freqItems.toList, oneItemCountMap)
   }
 
   def getMatrix(oneItemArr: Array[String],
