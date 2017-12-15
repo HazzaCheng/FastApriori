@@ -1,5 +1,6 @@
 package com.hazzacheng.AR
 
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{HashPartitioner, Partitioner, SparkContext}
@@ -40,7 +41,8 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
    // val newFreqItems = freqItems.indices.toArray
     val newCount = newData.count()
     minCount = math.ceil(minSupport * newCount).toInt
-    val freqItemsets = genFreqItemsets(newData, minCount, freqItems, partitioner)
+    val freqItemsBV = sc.broadcast(freqItems)
+    val freqItemsets = genFreqItemsets(newData, minCount, freqItemsBV, partitioner)
 
     (freqItemsets, itemToRank)
   }
@@ -70,8 +72,7 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
       val freqItems = freqItemsBV.value
       val itemToRank = itemToRankBV.value
       x.filter(freqItems.contains).map(itemToRank).sorted
-    }
-      .filter(_.length > 1)
+    }.filter(x => x.length > 1 && x.length < 50)
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     (freqItems, itemToRank, newData)
@@ -80,9 +81,10 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
   private def genFreqItemsets(
                                data: RDD[Array[Int]],
                                minCount: Int,
-                               freqItems: Array[String],
+                               freqItems: Broadcast[Array[String]],
                                partitioner: Partitioner
                              ): RDD[(Array[String], Int)] = {
+
     val freqItemsets = data.flatMap { transaction =>
       genCondTransactions(transaction, partitioner)
     }.aggregateByKey(new FPTree, partitioner.numPartitions)(
@@ -91,7 +93,7 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
       .flatMap { case (part, tree) =>
         tree.extract(minCount, x => partitioner.getPartition(x) == part)
       }.map { case (ranks, count) =>
-      (ranks.map(i => freqItems(i)).toArray, count)
+      (ranks.map(i => freqItems.value(i)).toArray, count)
     }
 
     freqItemsets
