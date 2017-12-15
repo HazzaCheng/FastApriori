@@ -72,7 +72,7 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
       val freqItems = freqItemsBV.value
       val itemToRank = itemToRankBV.value
       x.filter(freqItems.contains).map(itemToRank).sorted
-    }.filter(x => x.length > 1 && x.length < 50)
+    }.filter(x => x.length > 1 && x.length < 200)
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     (freqItems, itemToRank, newData)
@@ -87,7 +87,11 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
 
     val freqItemsets = data.flatMap { transaction =>
       genCondTransactions(transaction, partitioner)
-    }.aggregateByKey(new FPTree, partitioner.numPartitions)(
+    }.persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    freqItemsets.count()
+
+    freqItemsets.aggregateByKey(new FPTree, partitioner.numPartitions)(
         (tree, transaction) => tree.add(transaction, 1),
         (tree1, tree2) => tree1.merge(tree2))
       .flatMap { case (part, tree) =>
@@ -96,7 +100,7 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
       (ranks.map(i => freqItems.value(i)).toArray, count)
     }
 
-    freqItemsets
+   // freqItemsets
   }
 
   private def genCondTransactions(
