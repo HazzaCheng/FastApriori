@@ -94,27 +94,13 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
     val transactionsBV = sc.broadcast(newData.collectAsMap)
     val freqItemsBV = sc.broadcast(freqItems)
 
+    val test = freqItemsTrans.sortBy(_._2.length).slice(0, 30)
+
     val trees = sc.parallelize(freqItemsTrans, sc.defaultParallelism * 4)
       .map(x => buildTree(x, transactionsBV))
     val len = trees.count()
     println("==== trees " + len)
 
-  /*  val freqItemsets = data.flatMap { transaction =>
-      genCondTransactions(transaction, partitioner)
-    }.persist(StorageLevel.MEMORY_AND_DISK_SER)
-
-    freqItemsets.count()
-
-    freqItemsets.aggregateByKey(new FPTree, partitioner.numPartitions)(
-        (tree, transaction) => tree.add(transaction, 1),
-        (tree1, tree2) => tree1.merge(tree2))
-      .flatMap { case (part, tree) =>
-        tree.extract(minCount, x => partitioner.getPartition(x) == part)
-      }.map { case (ranks, count) =>
-      (ranks.map(i => freqItems.value(i)).toArray, count)
-    }*/
-
-   // freqItemsets
   }
 
 /*  private def genCondTransactions(
@@ -150,22 +136,30 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
 
   private def buildTree(itemWithIndexes: (Int, Array[Int]),
                         transactionsBV: Broadcast[collection.Map[Int, (Array[Int], Int)]]
-                       ): FPTree = {
+                       ): Unit = {
     val time = System.currentTimeMillis()
 
     val item = itemWithIndexes._1
     val indexes = itemWithIndexes._2
     val transactions = transactionsBV.value
     val tree = new FPTree
+
+    var sum = 0
     indexes.foreach{x =>
+      var time1 = System.nanoTime()
       val transcation = transactions(x)
       val i = findInArray(transcation._1, item)
-      tree.add(transcation._1.slice(0, i + 1), transcation._2)
+      val path = transcation._1.slice(0, i)
+      sum += path.length
+      print("Find " + (System.nanoTime() - time1))
+      time1 = System.nanoTime()
+      tree.add(path, transcation._2)
+      println(" Add " + (System.nanoTime() - time1))
     }
 
-    println("==== Use time: " + (System.currentTimeMillis() - time) + " " + item + " " + indexes.size)
+    println("==== Use time: " + (System.currentTimeMillis() - time) + " " + item + " " + indexes.size + " " + sum)
 
-    tree
+
   }
 
   private def findInArray(transaction: Array[Int], item: Int): Int = {

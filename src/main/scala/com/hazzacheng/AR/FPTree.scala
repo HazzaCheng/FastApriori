@@ -18,7 +18,7 @@ class FPTree extends Serializable {
 
   val root: Node = new Node(null)
 
-  private val summaries = mutable.HashMap.empty[Int, Summary]
+  private val summaries = mutable.Map.empty[Int, Summary]
 
   /** Adds a transaction with count. */
   def add(t: Iterable[Int], count: Int = 1): this.type = {
