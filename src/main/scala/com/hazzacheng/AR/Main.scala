@@ -18,8 +18,9 @@ object Main {
     val input = args(0)
     val output = args(1)
     val (dataRDD, userRDD) = utils.RddUtils.readAsRDD(sc, input)
-    val (freqItemsets, itemToRank) = new NFPGrowth(minSupport, 298).run(sc, dataRDD)
-    utils.RddUtils.formattedSave(sc, output, freqItemsets, itemToRank)
+//    val (freqItemsets, itemToRank) =
+    new NFPGrowth(minSupport, 298).run(sc, dataRDD)
+//    utils.RddUtils.formattedSave(sc, output, freqItemsets, itemToRank)
   }
 }
 

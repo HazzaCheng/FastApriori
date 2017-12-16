@@ -5,7 +5,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{HashPartitioner, Partitioner, SparkContext}
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 
 /**
   * Created with IntelliJ IDEA.
@@ -31,7 +31,7 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
   def run(
            sc: SparkContext,
            data: RDD[Array[String]]
-         ): (RDD[(Array[String], Int)], mutable.HashMap[String, Int]) = {
+         ): Unit/*(RDD[(Array[String], Int)], mutable.HashMap[String, Int])*/ = {
     val count = data.count()
     var minCount = math.ceil(minSupport * count).toInt
     val numParts = if (numPartitions > 0) numPartitions else data.partitions.length
@@ -41,10 +41,9 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
    // val newFreqItems = freqItems.indices.toArray
     val newCount = newData.count()
     minCount = math.ceil(minSupport * newCount).toInt
-    val freqItemsBV = sc.broadcast(freqItems)
-    val freqItemsets = genFreqItemsets(newData, minCount, freqItemsBV, partitioner)
+    val freqItemsets = genFreqItemsets(sc, newData, minCount, freqItems)
 
-    (freqItemsets, itemToRank)
+//    (freqItemsets, itemToRank)
   }
 
   private def genFreqItems(
@@ -52,7 +51,7 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
                             data: RDD[Array[String]],
                             minCount: Long,
                             partitioner: Partitioner
-                          ):(Array[String], mutable.HashMap[String, Int], RDD[Array[Int]]) = {
+                          ):(Array[String], mutable.HashMap[String, Int], RDD[(Int, (Array[Int], Int))]) = {
 
     val freqItemsSet = mutable.HashSet.empty[String]
     val itemToRank = mutable.HashMap.empty[String, Int]
@@ -71,21 +70,36 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
     val newData = data.map{x =>
       val freqItems = freqItemsBV.value
       val itemToRank = itemToRankBV.value
-      x.filter(freqItems.contains).map(itemToRank).sorted
-    }.filter(x => x.length > 1 && x.length < 200)
+      (x.filter(freqItems.contains).map(itemToRank).toSet, 1)
+    }.filter {
+      case (transcation, count) =>
+        transcation.size > 1 && transcation.size < 200
+    }
+      .reduceByKey(_ + _)
+      .map(x => (x._1.toArray, x._2))
+      .zipWithIndex()
+      .map(x => (x._2.toInt, x._1))
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     (freqItems, itemToRank, newData)
   }
 
   private def genFreqItemsets(
-                               data: RDD[Array[Int]],
+                               sc: SparkContext,
+                               newData: RDD[(Int, (Array[Int], Int))],
                                minCount: Int,
-                               freqItems: Broadcast[Array[String]],
-                               partitioner: Partitioner
-                             ): RDD[(Array[String], Int)] = {
+                               freqItems: Array[String]
+                             ): Unit/*RDD[(Array[String], Int)]*/ = {
+    val freqItemsTrans = getFreqItemsTrans(newData, freqItems)
+    val transactionsBV = sc.broadcast(newData.collectAsMap)
+    val freqItemsBV = sc.broadcast(freqItems)
 
-    val freqItemsets = data.flatMap { transaction =>
+    val trees = sc.parallelize(freqItemsTrans, sc.defaultParallelism * 4)
+      .map(x => buildTree(x, transactionsBV))
+    val len = trees.count()
+    println("==== trees " + len)
+
+  /*  val freqItemsets = data.flatMap { transaction =>
       genCondTransactions(transaction, partitioner)
     }.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
@@ -98,12 +112,12 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
         tree.extract(minCount, x => partitioner.getPartition(x) == part)
       }.map { case (ranks, count) =>
       (ranks.map(i => freqItems.value(i)).toArray, count)
-    }
+    }*/
 
    // freqItemsets
   }
 
-  private def genCondTransactions(
+/*  private def genCondTransactions(
                                    transaction: Array[Int],
                                    partitioner: Partitioner
                                  ): mutable.Map[Int, Array[Int]] = {
@@ -117,6 +131,48 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
       i -= 1
     }
     output
+  }*/
+
+  private def getFreqItemsTrans(newData: RDD[(Int, (Array[Int], Int))],
+                                freqItems: Array[String]
+                               ): Array[(Int, Array[Int])] = {
+    val itemsWithTrans = freqItems.indices
+      .map(x => (x, newData.filter(y => arrayContains(y._2._1, x)).map(_._1).collect()))
+      .toArray
+
+    itemsWithTrans
+  }
+
+  private def arrayContains(transaction: Array[Int], item: Int): Boolean = {
+    transaction.foreach(x => if (x == item) return true)
+    false
+  }
+
+  private def buildTree(itemWithIndexes: (Int, Array[Int]),
+                        transactionsBV: Broadcast[collection.Map[Int, (Array[Int], Int)]]
+                       ): FPTree = {
+    val time = System.currentTimeMillis()
+
+    val item = itemWithIndexes._1
+    val indexes = itemWithIndexes._2
+    val transactions = transactionsBV.value
+    val tree = new FPTree
+    indexes.foreach{x =>
+      val transcation = transactions(x)
+      val i = findInArray(transcation._1, item)
+      tree.add(transcation._1.slice(0, i + 1), transcation._2)
+    }
+
+    println("==== Use time: " + (System.currentTimeMillis() - time) + " " + item + " " + indexes.size)
+
+    tree
+  }
+
+  private def findInArray(transaction: Array[Int], item: Int): Int = {
+    val n = transaction.length
+    for (i <- 0 until n)
+      if (transaction(i) == item) return i
+    0
   }
 
 }

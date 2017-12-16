@@ -3,6 +3,15 @@ package com.hazzacheng.AR
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
+/**
+  * Created with IntelliJ IDEA.
+  * Description:
+  * User: HazzaCheng
+  * Contact: hazzacheng@gmail.com
+  * Date: 17-12-14
+  * Time: 10:03 PM
+  */
+
 class FPTree extends Serializable {
 
   import FPTree._
