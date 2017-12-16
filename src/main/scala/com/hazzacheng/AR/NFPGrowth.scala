@@ -17,6 +17,8 @@ import scala.collection.{immutable, mutable}
   */
 
 class NFPGrowth (private var minSupport: Double, private var numPartitions: Int) extends Serializable {
+  val nums = 4
+
 
   def setMinSupport(minSupport: Double): this.type = {
     this.minSupport = minSupport
@@ -39,9 +41,9 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
     val (freqItems, itemToRank, newData) = genFreqItems(sc, data, minCount, partitioner)
     data.unpersist()
    // val newFreqItems = freqItems.indices.toArray
-    val newCount = newData.count()
-    minCount = math.ceil(minSupport * newCount).toInt
-    val freqItemsets = genFreqItemsets(sc, newData, minCount, freqItems)
+    val totalCount = newData.count().toInt
+    minCount = math.ceil(minSupport * totalCount).toInt
+    val freqItemsets = genFreqItemsets(sc, newData, totalCount, minCount, freqItems)
 
 //    (freqItemsets, itemToRank)
   }
@@ -84,9 +86,43 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
     (freqItems, itemToRank, newData)
   }
 
+  private def genTwoFreqItems(
+                               sc: SparkContext,
+                               newData: RDD[(Int, (Array[Int], Int))],
+                               freqItemsTrans: Map[Int, Array[Int]],
+                               totalCount: Int,
+                               minCount: Int
+                             ): RDD[((Int, Int), Array[Int])] = {
+    val freqItemsSize = freqItemsTrans.size
+    val tuples = mutable.ListBuffer.empty[(Int, Int)]
+    val countMapBV = sc.broadcast(newData.map(x => (x._1, x._2._2)).collectAsMap())
+    val freqItemsTransBV = sc.broadcast(freqItemsTrans)
+
+    for (i <- 0 until freqItemsSize - 1)
+      for (j <- i + 1 until freqItemsSize)
+        tuples.append((i, j))
+
+    val res = sc.parallelize(tuples.toList, sc.defaultParallelism * nums).map{t =>
+      val countMap = countMapBV.value
+      val freqItemsTrans = freqItemsTransBV.value
+      val x = new Array[Boolean](totalCount)
+      val y = new Array[Boolean](totalCount)
+      freqItemsTrans(t._1).foreach(x(_) = true)
+      freqItemsTrans(t._2).foreach(y(_) = true)
+      val indexes = Range(0, totalCount).filter(i => x(i) && y(i)).toArray
+      var count = 0
+      indexes.foreach(count += countMap(_))
+      if (count >= minCount) (t, indexes)
+      else (t, Array.empty[Int])
+    }.filter(_._2.nonEmpty)
+
+    res
+  }
+
   private def genFreqItemsets(
                                sc: SparkContext,
                                newData: RDD[(Int, (Array[Int], Int))],
+                               totalCount: Int,
                                minCount: Int,
                                freqItems: Array[String]
                              ): Unit/*RDD[(Array[String], Int)]*/ = {
@@ -94,9 +130,12 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
     val transactionsBV = sc.broadcast(newData.collectAsMap)
     val freqItemsBV = sc.broadcast(freqItems)
 
-    val test = freqItemsTrans.sortBy(_._2.length).slice(0, 30)
+    val tuples = genTwoFreqItems(sc, newData, freqItemsTrans.toMap, totalCount, minCount)
+    val tuplesCount = tuples.count()
+    println("==== tuples " + tuplesCount)
 
-    val trees = sc.parallelize(freqItemsTrans, sc.defaultParallelism * 4)
+
+    val trees = sc.parallelize(freqItemsTrans, sc.defaultParallelism * nums)
       .map(x => buildTree(x, transactionsBV))
     val len = trees.count()
     println("==== trees " + len)
