@@ -16,8 +16,6 @@ import scala.collection.mutable
   * Time: 10:12 AM
   */
 class Apriori(private var minSupport: Double, private var numPartitions: Int) extends Serializable {
-  val nums = 40
-
 
   def setMinSupport(minSupport: Double): this.type = {
     this.minSupport = minSupport
@@ -120,7 +118,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
      /* val candidates = genCandidates(sc, kItems, freqItemsSize)
       println("==== " + k + " candidate items " + candidates.length)*/
       val kItemsBV = sc.broadcast(kItems)
-      val temp = genNextFreqItemsets(kItemsetRDD, countMapBV, freqItemsTransBV, kItemsBV, freqItemsSize, totalCount, minCount)
+      val temp = genNextFreqItemsets(sc, kItemsetRDD, countMapBV, freqItemsTransBV, kItemsBV, freqItemsSize, totalCount, minCount)
       val kItemsWithCount = temp.map(x => (x._1, x._3)).collect()
       freqItemsets ++= kItemsWithCount
       kItems = kItemsWithCount.map(_._1)
@@ -142,6 +140,54 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
   }
 
   private def genNextFreqItemsets(
+                                   sc: SparkContext,
+                                   kItemsetRDD: RDD[(Set[Int], Array[Boolean], Int)],
+                                   countMapBV: Broadcast[collection.Map[Int, Int]],
+                                   freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
+                                   kItemsBV: Broadcast[Array[Set[Int]]],
+                                   freqItemsSize: Int,
+                                   totalCount: Int,
+                                   minCount: Int
+                                 ): RDD[(Set[Int], Array[Boolean], Int)] = {
+    val candidates = kItemsetRDD.flatMap { case (kItems, line, count) =>
+      val kItemsSet = kItemsBV.value
+      val items = mutable.HashSet.empty[Int]
+      Range(kItems.max + 1, freqItemsSize).foreach(items.add)
+      items --= kItems
+      val temp = kItems.toArray
+      val len = temp.length
+      var i = 0
+      while (items.nonEmpty && i < len) {
+        val subSet = kItems - temp(i)
+        items.toArray.foreach { i =>
+          if (!kItemsSet.contains(subSet + i))
+            items -= i
+        }
+        i += 1
+      }
+      items.map(x => (kItems, x, line))
+    }
+
+    val kPlusOneItemset = candidates.map{ case (kItems, item, line)  =>
+      val countMap = countMapBV.value
+      val freqItemsTrans = freqItemsTransBV.value
+      val iLine = freqItemsTrans(item)
+      val temp = new Array[Boolean](totalCount)
+      val indexes = Range(0, totalCount).filter { i =>
+        temp(i) = iLine(i) && line(i)
+        iLine(i) && line(i)
+      }.toArray
+      var count = 0
+      indexes.foreach(count += countMap(_))
+      if (count >= minCount) (kItems + item, temp, count)
+      else (Set.empty[Int], Array.empty[Boolean], 0)
+    }.filter(_._3 != 0).persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    kPlusOneItemset
+  }
+
+  private def genNextFreqItemsets2(
+                                    sc: SparkContext,
                                    kItemsetRDD: RDD[(Set[Int], Array[Boolean], Int)],
                                    countMapBV: Broadcast[collection.Map[Int, Int]],
                                    freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
@@ -177,7 +223,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
         }.toArray
         var iCount = 0
         indexes.foreach(iCount += countMap(_))
-        if (count >= minCount) (kItems + i, temp, iCount)
+        if (iCount >= minCount) (kItems + i, temp, iCount)
         else (Set.empty[Int], Array.empty[Boolean], 0)
       }.filter(_._3 != 0)
 
@@ -198,7 +244,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
                              freqItemsSize: Int
                            ): Array[Set[Int]] = {
     val kItemsSetBV = sc.broadcast(kItems.toSet)
-    val candidates = sc.parallelize(kItems, sc.defaultParallelism * nums * 10).flatMap{x =>
+    val candidates = sc.parallelize(kItems).flatMap{x =>
 //      val time = System.currentTimeMillis()
       val kItemsSet = kItemsSetBV.value
       val candidates = mutable.HashSet.empty[Int]
@@ -257,7 +303,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
 
     println("==== 2 candidates items " + tuples.length)
 
-    val res = sc.parallelize(tuples.toList, sc.defaultParallelism * nums).map{t =>
+    val res = sc.parallelize(tuples.toList, sc.defaultParallelism * 4).map{t =>
       val countMap = countMapBV.value
       val freqItemsTrans = freqItemsTransBV.value
       val x = freqItemsTrans(t._1)

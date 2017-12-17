@@ -13,7 +13,14 @@ import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 
 object Main {
   def main(args: Array[String]) {
-    val sc = new SparkContext()
+    val conf = new SparkConf()
+      .set("spark.rdd.compress", "true")
+      .set("spark.speculation", "true")
+      .set("spark.storage.memoryFraction", "0.3")
+      .set("spark.default.parallelism", "180")
+      .set("spark.shuffle.compress", "true")
+
+    val sc = new SparkContext(conf)
     val minSupport = 0.092
     val input = args(0)
     val output = args(1)
