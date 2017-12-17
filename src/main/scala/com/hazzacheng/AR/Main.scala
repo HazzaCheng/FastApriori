@@ -19,7 +19,8 @@ object Main {
     val output = args(1)
     val (dataRDD, userRDD) = utils.RddUtils.readAsRDD(sc, input)
 //    val (freqItemsets, itemToRank) =
-    new NFPGrowth(minSupport, 298).run(sc, dataRDD)
+//    new NFPGrowth(minSupport).run(sc, dataRDD)
+    new Apriori(minSupport, 180).run(sc, dataRDD, output)
 //    utils.RddUtils.formattedSave(sc, output, freqItemsets, itemToRank)
   }
 }

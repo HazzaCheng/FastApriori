@@ -16,7 +16,7 @@ import scala.collection.{immutable, mutable}
   * Time: 10:03 PM
   */
 
-class NFPGrowth (private var minSupport: Double, private var numPartitions: Int) extends Serializable {
+class NFPGrowth(private var minSupport: Double, private var numPartitions: Int) extends Serializable {
   val nums = 4
 
 
@@ -39,9 +39,9 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
     val numParts = if (numPartitions > 0) numPartitions else data.partitions.length
     val partitioner = new HashPartitioner(numParts)
     val (freqItems, itemToRank, newData) = genFreqItems(sc, data, minCount, partitioner)
-    data.unpersist()
    // val newFreqItems = freqItems.indices.toArray
     val totalCount = newData.count().toInt
+    data.unpersist()
     minCount = math.ceil(minSupport * totalCount).toInt
     val freqItemsets = genFreqItemsets(sc, newData, totalCount, minCount, freqItems)
 
@@ -131,7 +131,7 @@ class NFPGrowth (private var minSupport: Double, private var numPartitions: Int)
     val freqItemsBV = sc.broadcast(freqItems)
 
     val tuples = genTwoFreqItems(sc, newData, freqItemsTrans.toMap, totalCount, minCount)
-      .repartition(sc.defaultParallelism * nums)
+      .repartition(sc.defaultParallelism * nums * 10)
       .persist(StorageLevel.MEMORY_AND_DISK_SER)
     val tuplesCount = tuples.count()
     println("==== tuples " + tuplesCount)
