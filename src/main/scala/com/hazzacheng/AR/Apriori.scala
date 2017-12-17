@@ -16,7 +16,7 @@ import scala.collection.mutable
   * Time: 10:12 AM
   */
 class Apriori(private var minSupport: Double, private var numPartitions: Int) extends Serializable {
-  val nums = 4
+  val nums = 40
 
 
   def setMinSupport(minSupport: Double): this.type = {
@@ -107,7 +107,8 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
     val freqItemsets = mutable.ListBuffer.empty[(Set[Int], Int)]
 
     var time = System.currentTimeMillis()
-    val tuplesWithCount = genTwoFreqItems(sc, countMapBV, freqItemsTransBV, freqItemsSize, totalCount, minCount)
+    var kItemsetRDD = genTwoFreqItems(sc, countMapBV, freqItemsTransBV, freqItemsSize, totalCount, minCount)
+    val tuplesWithCount = kItemsetRDD.map(x => (x._1, x._3)).collect()
     freqItemsets ++= tuplesWithCount
     var kItems = tuplesWithCount.map(_._1)
     println("==== 2 freq items " + kItems.length)
@@ -116,11 +117,16 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
     var k = 3
     while (kItems.length >= k) {
       time = System.currentTimeMillis()
-      val candidates = genCandidates(sc, kItems, freqItemsSize)
-      println("==== " + k + " candidate items " + candidates.length)
-      val kItemsWithCount = genKFreqItemsets(sc, candidates, countMapBV, freqItemsTransBV, freqItemsSize, totalCount, minCount)
+     /* val candidates = genCandidates(sc, kItems, freqItemsSize)
+      println("==== " + k + " candidate items " + candidates.length)*/
+      val kItemsBV = sc.broadcast(kItems)
+      val temp = genNextFreqItemsets(kItemsetRDD, countMapBV, freqItemsTransBV, kItemsBV, freqItemsSize, totalCount, minCount)
+      val kItemsWithCount = temp.map(x => (x._1, x._3)).collect()
       freqItemsets ++= kItemsWithCount
       kItems = kItemsWithCount.map(_._1)
+      kItemsBV.unpersist()
+      kItemsetRDD.unpersist()
+      kItemsetRDD = temp
       println("==== " + k + " freq items " + kItems.length)
       println("==== Use Time " + k + " items " + (System.currentTimeMillis() - time))
       k += 1
@@ -135,24 +141,48 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
     freqItemsets.toArray
   }
 
-  private def genKFreqItemsets(sc: SparkContext,
-                               candidates: Array[Set[Int]],
-                               countMapBV: Broadcast[collection.Map[Int, Int]],
-                               freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
-                               freqItemsSize: Int,
-                               totalCount: Int,
-                               minCount: Int): Array[(Set[Int], Int)] = {
+  private def genNextFreqItemsets(
+                                   kItemsetRDD: RDD[(Set[Int], Array[Boolean], Int)],
+                                   countMapBV: Broadcast[collection.Map[Int, Int]],
+                                   freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
+                                   kItemsBV: Broadcast[Array[Set[Int]]],
+                                   freqItemsSize: Int,
+                                   totalCount: Int,
+                                   minCount: Int
+                                 ): RDD[(Set[Int], Array[Boolean], Int)] = {
+    val res = kItemsetRDD.flatMap { case (kItems, line, count) =>
+      val kItemsSet = kItemsBV.value
+      val candidates = mutable.HashSet.empty[Int]
+      Range(kItems.max + 1, freqItemsSize).foreach(candidates.add)
+      candidates --= kItems
+      val temp = kItems.toArray
+      val len = temp.length
+      var i = 0
+      while (candidates.nonEmpty && i < len) {
+        val subSet = kItems - temp(i)
+        candidates.toArray.foreach { i =>
+          if (!kItemsSet.contains(subSet + i))
+            candidates -= i
+        }
+        i += 1
+      }
+      val kPlusOneItemset = candidates.toArray.map { i =>
+        val countMap = countMapBV.value
+        val freqItemsTrans = freqItemsTransBV.value
+        val iLine = freqItemsTrans(i)
+        val temp = new Array[Boolean](totalCount)
+        val indexes = Range(0, totalCount).filter { i =>
+          temp(i) = iLine(i) && line(i)
+          iLine(i) && line(i)
+        }.toArray
+        var iCount = 0
+        indexes.foreach(iCount += countMap(_))
+        if (count >= minCount) (kItems + i, temp, iCount)
+        else (Set.empty[Int], Array.empty[Boolean], 0)
+      }.filter(_._3 != 0)
 
-    val res = sc.parallelize(candidates, sc.defaultParallelism * nums * 10).map{x =>
-      val countMap = countMapBV.value
-      val freqItemsTrans = freqItemsTransBV.value
-      val items = x.toArray.map(freqItemsTrans(_))
-      val indexes = Range(0, totalCount).filter(i => logicalAnd(i, items))
-      var count = 0
-      indexes.foreach(count += countMap(_))
-      if (count >= minCount) (x, count)
-      else (Set.empty[Int], 0)
-    }.filter(_._2 != 0).collect()
+      kPlusOneItemset
+    }.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     res
   }
@@ -189,6 +219,8 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
       candidates.toArray.map(x + _)
     }.collect().distinct
 
+    kItemsSetBV.unpersist()
+
     candidates
   }
 
@@ -216,7 +248,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
                                freqItemsSize: Int,
                                totalCount: Int,
                                minCount: Int
-                             ): Array[(Set[Int], Int)] = {
+                             ): RDD[(Set[Int], Array[Boolean], Int)] = {
     val tuples = mutable.ListBuffer.empty[(Int, Int)]
 
     for (i <- 0 until freqItemsSize - 1)
@@ -230,12 +262,16 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
       val freqItemsTrans = freqItemsTransBV.value
       val x = freqItemsTrans(t._1)
       val y = freqItemsTrans(t._2)
-      val indexes = Range(0, totalCount).filter(i => x(i) && y(i)).toArray
+      val line = new Array[Boolean](totalCount)
+      val indexes = Range(0, totalCount).filter{i =>
+        line(i) = x(i) && y(i)
+        x(i) && y(i)
+      }.toArray
       var count = 0
       indexes.foreach(count += countMap(_))
-      if (count >= minCount) (Set[Int](t._1, t._2), count)
-      else (Set.empty[Int], 0)
-    }.filter(_._2 != 0).collect()
+      if (count >= minCount) (Set[Int](t._1, t._2), line, count)
+      else (Set.empty[Int], Array.empty[Boolean], 0)
+    }.filter(_._3 != 0).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     res
   }
