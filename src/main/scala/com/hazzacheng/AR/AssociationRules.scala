@@ -15,14 +15,20 @@ import scala.collection.mutable
   */
 class AssociationRules(
                         private val freqItemset: Array[(Set[Int], Int)]
-                      ) {
+                      ) extends Serializable {
 
   def run(
            sc: SparkContext,
            userRDD: RDD[Array[String]],
-           itemToRankTP: mutable.HashMap[String, Int],
-           freqItemsTP: Array[String]
+           itemToRank: mutable.HashMap[String, Int],
+           freqItems: Array[String]
          ) = {
+
+  }
+
+  def removeRedundancy(
+                      sc: SparkContext
+                      ) = {
 
   }
 

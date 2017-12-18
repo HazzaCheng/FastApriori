@@ -15,7 +15,8 @@ import scala.collection.mutable
   * Date: 17-12-17 
   * Time: 10:12 AM
   */
-class FastApriori(private var minSupport: Double, private var numPartitions: Int) {
+class FastApriori(private var minSupport: Double, private var numPartitions: Int) extends Serializable {
+
 
   def setMinSupport(minSupport: Double): this.type = {
     this.minSupport = minSupport
