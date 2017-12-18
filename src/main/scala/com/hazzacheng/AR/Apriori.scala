@@ -32,9 +32,8 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
     val partitioner = new HashPartitioner(numParts)
 
     val count = data.count()
-    var minCount = math.ceil(minSupport * count).toInt
+    val minCount = math.ceil(minSupport * count).toInt
     val (freqItems, itemToRank, newData, countMap, totalCount) = genFreqItems(sc, data, minCount, partitioner)
-    minCount = math.ceil(minSupport * totalCount).toInt
     val freqItemsets = genFreqItemsets(sc, newData, countMap, totalCount, minCount, freqItems)
 
     val time = System.currentTimeMillis()
@@ -70,10 +69,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
       val freqItems = freqItemsBV.value
       val itemToRank = itemToRankBV.value
       (x.filter(freqItems.contains).map(itemToRank).toSet, 1)
-    }.filter {
-      case (transcation, count) =>
-        transcation.size > 1 && transcation.size < 200
-    }
+    }.filter(_._1.size > 1)
       .reduceByKey(_ + _)
       .map(x => (x._1.toArray, x._2))
       .zipWithIndex()

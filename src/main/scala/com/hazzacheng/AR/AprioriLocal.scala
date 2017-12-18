@@ -69,10 +69,7 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
       val freqItems = freqItemsBV.value
       val itemToRank = itemToRankBV.value
       (x.filter(freqItems.contains).map(itemToRank).toSet, 1)
-    }.filter {
-      case (transcation, count) =>
-        transcation.size > 1 && transcation.size < 200
-    }
+    }.filter(_._1.size > 1)
       .reduceByKey(_ + _)
       .map(x => (x._1.toArray, x._2))
       .zipWithIndex()
