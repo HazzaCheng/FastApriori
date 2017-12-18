@@ -33,6 +33,7 @@ object Main {
     Utils.saveFreqItemset(sc, output, freqItemsets, freqItems)
 */
     val (freqItemsetTP, itemToRankTP, freqItemsTP) = Utils.getAll(sc)
+    new AssociationRules(freqItemsetTP).run(sc, userRDD, itemToRankTP, freqItemsTP)
   }
 }
 

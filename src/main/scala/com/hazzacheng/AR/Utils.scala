@@ -32,28 +32,26 @@ object Utils {
                        freqItemsets: Array[(Set[Int], Int)],
                        freqItems: Array[String]
                      ): Unit = {
-    val freqItemsBV = sc.broadcast(freqItems)
-    sc.parallelize(freqItemsets).map { f =>
-      val freqItemset = freqItemsBV.value
-      f._1.toArray.sortBy(-_).map(freqItemset(_)).mkString(" ")
-    }.sortBy(_).repartition(1).saveAsTextFile(output + "freqItems")
-
-    /*
-        val strs = freqItemsets.map(f =>
-          f._1.toArray.sortBy(-_).map(freqItems(_)).mkString(" ")).sorted
-        sc.parallelize(strs).repartition(1).saveAsTextFile(output + "freqItems")
-    */
+    /*  val freqItemsBV = sc.broadcast(freqItems)
+      sc.parallelize(freqItemsets).map { f =>
+        val freqItemset = freqItemsBV.value
+        f._1.toArray.sortBy(-_).map(freqItemset(_)).mkString(" ")
+      }.repartition(1).sortBy(x => x).saveAsTextFile(output + "freqItems")
+      freqItemsBV.unpersist()*/
+    val strs = freqItemsets.map(f =>
+      f._1.toArray.sortBy(-_).map(freqItems(_)).mkString(" ")).sorted
+    sc.parallelize(strs).repartition(1).saveAsTextFile(output + "freqItems")
   }
 
   def getAll(sc: SparkContext) = {
     val freqItemsetRDD = sc.textFile("/data/freqItemset")
     val freqItemsRDD = sc.textFile("/data/FreqItems")
-    val itemToRankRDD = sc.textFile("/data/ItemToRank")
+    val itemToRankRDD = sc.textFile("/data/ItemsToRank")
 
 
     val itemToRankTP = mutable.HashMap.empty[String, Int]
     itemToRankRDD.map(_.split(" ")).collect().foreach(x => itemToRankTP.put(x(0), x(1).toInt))
-    val freqItemsTP = freqItemsetRDD.collect().sortBy(itemToRankTP(_))
+    val freqItemsTP = freqItemsRDD.collect().sortBy(itemToRankTP(_))
 
     val freqItemsetTP = freqItemsetRDD.map{x =>
       val whole = x.split(" ")

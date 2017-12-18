@@ -37,8 +37,8 @@ class FastApriori(private var minSupport: Double, private var numPartitions: Int
 
     val count = data.count()
     val minCount = math.ceil(minSupport * count).toInt
-    val (freqItems, itemToRank, newData, countMap, totalCount) = genFreqItems(sc, data, minCount, partitioner)
-    val freqItemsets = genFreqItemsets(sc, newData, countMap, totalCount, minCount, freqItems)
+    val (freqItemsWithCount, freqItems, itemToRank, newData, countMap, totalCount) = genFreqItems(sc, data, minCount, partitioner)
+    val freqItemsets = genFreqItemsets(sc, newData, countMap, totalCount, minCount, freqItems) ++ freqItemsWithCount
 
     (freqItemsets, itemToRank, freqItems)
   }
@@ -48,17 +48,17 @@ class FastApriori(private var minSupport: Double, private var numPartitions: Int
                             data: RDD[Array[String]],
                             minCount: Long,
                             partitioner: Partitioner
-                          ):(Array[String], mutable.HashMap[String, Int], RDD[(Int, Array[Int])], collection.Map[Int, Int], Int) = {
+                          ):(Array[(Set[Int], Int)], Array[String], mutable.HashMap[String, Int], RDD[(Int, Array[Int])], collection.Map[Int, Int], Int) = {
 
     val freqItemsSet = mutable.HashSet.empty[String]
     val itemToRank = mutable.HashMap.empty[String, Int]
 
-    val freqItems = data.flatMap(_.map((_, 1)))
+    val tmp = data.flatMap(_.map((_, 1)))
       .reduceByKey(partitioner, _ + _)
       .filter(_._2 >= minCount)
       .collect()
-      .sortBy(-_._2)
-      .map(_._1)
+
+    val freqItems = tmp.sortBy(-_._2).map(_._1)
     freqItems.foreach(freqItemsSet.add)
     freqItems.zipWithIndex.foreach(x => itemToRank.put(x._1, x._2))
 
@@ -81,7 +81,9 @@ class FastApriori(private var minSupport: Double, private var numPartitions: Int
     data.unpersist()
     temp.unpersist()
 
-    (freqItems, itemToRank, newData, countMap, totalCount)
+    val freqItemsWithCount = tmp.map(x => (Set[Int](itemToRank(x._1)), x._2))
+
+    (freqItemsWithCount, freqItems, itemToRank, newData, countMap, totalCount)
   }
 
   private def genFreqItemsets(
@@ -91,7 +93,7 @@ class FastApriori(private var minSupport: Double, private var numPartitions: Int
                                totalCount: Int,
                                minCount: Int,
                                freqItems: Array[String]
-                             ) = {
+                             ): Array[(Set[Int], Int)] = {
     val freqItemsSize = freqItems.length
     val freqItemsTrans = getFreqItemsTrans(newData, freqItems, totalCount)
     val freqItemsBV = sc.broadcast(freqItems)
