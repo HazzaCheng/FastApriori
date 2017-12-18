@@ -1,9 +1,9 @@
 package com.hazzacheng.AR
 
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.{HashPartitioner, Partitioner, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.{HashPartitioner, Partitioner, SparkContext}
 
 import scala.collection.mutable
 
@@ -129,12 +129,12 @@ class FastApriori(private var minSupport: Double, private var numPartitions: Int
   }
 
   private def genNextFreqItemsets(sc: SparkContext,
-                               candidates: Array[(Set[Int], Array[Int])],
-                               countMapBV: Broadcast[collection.Map[Int, Int]],
-                               freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
-                               freqItemsSize: Int,
-                               totalCount: Int,
-                               minCount: Int): Array[(Set[Int], Int)] = {
+                                  candidates: Array[(Set[Int], Array[Int])],
+                                  countMapBV: Broadcast[collection.Map[Int, Int]],
+                                  freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
+                                  freqItemsSize: Int,
+                                  totalCount: Int,
+                                  minCount: Int): Array[(Set[Int], Int)] = {
 
     val res = sc.parallelize(candidates).flatMap { case (subSet, items) =>
       val countMap = countMapBV.value

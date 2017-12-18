@@ -1,7 +1,6 @@
 package com.hazzacheng.AR
 
 import org.apache.spark.SparkContext
-import org.apache.spark.mllib.fpm.FPGrowth
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
@@ -39,11 +38,11 @@ object Utils {
       f._1.toArray.sortBy(-_).map(freqItemset(_)).mkString(" ")
     }.sortBy(_).repartition(1).saveAsTextFile(output + "freqItems")
 
-/*
-    val strs = freqItemsets.map(f =>
-      f._1.toArray.sortBy(-_).map(freqItems(_)).mkString(" ")).sorted
-    sc.parallelize(strs).repartition(1).saveAsTextFile(output + "freqItems")
-*/
+    /*
+        val strs = freqItemsets.map(f =>
+          f._1.toArray.sortBy(-_).map(freqItems(_)).mkString(" ")).sorted
+        sc.parallelize(strs).repartition(1).saveAsTextFile(output + "freqItems")
+    */
   }
 
   def getAll(sc: SparkContext) = {

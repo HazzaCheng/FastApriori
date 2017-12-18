@@ -9,7 +9,7 @@ package com.hazzacheng.AR
   * Date: 2017-09-26
   * Time: 10:04 PM
   */
-import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
+import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
   def main(args: Array[String]) {

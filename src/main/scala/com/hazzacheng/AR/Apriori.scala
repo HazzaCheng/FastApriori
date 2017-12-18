@@ -1,9 +1,9 @@
 package com.hazzacheng.AR
 
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.{HashPartitioner, Partitioner, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.{HashPartitioner, Partitioner, SparkContext}
 
 import scala.collection.mutable
 
@@ -110,8 +110,8 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
     var k = 3
     while (kItems.length >= k) {
       time = System.currentTimeMillis()
-     /* val candidates = genCandidates(sc, kItems, freqItemsSize)
-      println("==== " + k + " candidate items " + candidates.length)*/
+      /* val candidates = genCandidates(sc, kItems, freqItemsSize)
+       println("==== " + k + " candidate items " + candidates.length)*/
       val kItemsBV = sc.broadcast(kItems)
       val temp = genNextFreqItemsets1(sc, kItemsetRDD, countMapBV, freqItemsTransBV, kItemsBV, freqItemsSize, totalCount, minCount)
       val kItemsWithCount = temp.collect().map(x => (x._1, x._3))//.collect()
@@ -286,7 +286,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
                            ): Array[Set[Int]] = {
     val kItemsSetBV = sc.broadcast(kItems.toSet)
     val candidates = sc.parallelize(kItems).flatMap{x =>
-//      val time = System.currentTimeMillis()
+      //      val time = System.currentTimeMillis()
       val kItemsSet = kItemsSetBV.value
       val candidates = mutable.HashSet.empty[Int]
       Range(0, freqItemsSize).foreach(candidates.add)
@@ -302,7 +302,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
         }
         i += 1
       }
-//      println("==== Use Time" + (System.currentTimeMillis() - time) + " " + x)
+      //      println("==== Use Time" + (System.currentTimeMillis() - time) + " " + x)
       candidates.toArray.map(x + _)
     }.collect().distinct
 
@@ -364,13 +364,13 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
   }
 
   private def genTwoFreqItems1(
-                               sc: SparkContext,
-                               countMapBV: Broadcast[collection.Map[Int, Int]],
-                               freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
-                               freqItemsSize: Int,
-                               totalCount: Int,
-                               minCount: Int
-                             ): RDD[(Set[Int], List[Int], Int)] = {
+                                sc: SparkContext,
+                                countMapBV: Broadcast[collection.Map[Int, Int]],
+                                freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
+                                freqItemsSize: Int,
+                                totalCount: Int,
+                                minCount: Int
+                              ): RDD[(Set[Int], List[Int], Int)] = {
     val tuples = mutable.ListBuffer.empty[(Int, Int)]
 
     for (i <- 0 until freqItemsSize - 1)
