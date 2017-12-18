@@ -16,9 +16,12 @@ object Main {
     val conf = new SparkConf()
       .set("spark.rdd.compress", "true")
       .set("spark.speculation", "true")
-      .set("spark.storage.memoryFraction", "0.3")
       .set("spark.default.parallelism", "180")
-      .set("spark.shuffle.compress", "true")
+//      .set("spark.shuffle.compress", "true")
+//      .set("spark.shuffle.memoryFraction", "0.3")
+      .set("spark.storage.memoryFraction", "0.5")
+
+    conf.getAll.foreach(x => println("==== " + x))
 
     val sc = new SparkContext(conf)
     val minSupport = 0.092
@@ -27,7 +30,7 @@ object Main {
     val (dataRDD, userRDD) = utils.RddUtils.readAsRDD(sc, input)
 //    val (freqItemsets, itemToRank) =
 //    new NFPGrowth(minSupport).run(sc, dataRDD)
-    new Apriori(minSupport, 180).run(sc, dataRDD, output)
+    new Apriori(minSupport, sc.defaultParallelism).run(sc, dataRDD, output)
 //    utils.RddUtils.formattedSave(sc, output, freqItemsets, itemToRank)
   }
 }

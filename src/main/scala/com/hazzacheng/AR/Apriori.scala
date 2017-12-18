@@ -105,7 +105,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
     val freqItemsets = mutable.ListBuffer.empty[(Set[Int], Int)]
 
     var time = System.currentTimeMillis()
-    var kItemsetRDD = genTwoFreqItems(sc, countMapBV, freqItemsTransBV, freqItemsSize, totalCount, minCount)
+    var kItemsetRDD = genTwoFreqItems1(sc, countMapBV, freqItemsTransBV, freqItemsSize, totalCount, minCount)
     val tuplesWithCount = kItemsetRDD.map(x => (x._1, x._3)).collect()
     freqItemsets ++= tuplesWithCount
     var kItems = tuplesWithCount.map(_._1)
@@ -118,8 +118,8 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
      /* val candidates = genCandidates(sc, kItems, freqItemsSize)
       println("==== " + k + " candidate items " + candidates.length)*/
       val kItemsBV = sc.broadcast(kItems)
-      val temp = genNextFreqItemsets(sc, kItemsetRDD, countMapBV, freqItemsTransBV, kItemsBV, freqItemsSize, totalCount, minCount)
-      val kItemsWithCount = temp.map(x => (x._1, x._3)).collect()
+      val temp = genNextFreqItemsets1(sc, kItemsetRDD, countMapBV, freqItemsTransBV, kItemsBV, freqItemsSize, totalCount, minCount)
+      val kItemsWithCount = temp.collect().map(x => (x._1, x._3))//.collect()
       freqItemsets ++= kItemsWithCount
       kItems = kItemsWithCount.map(_._1)
       kItemsBV.unpersist()
@@ -186,17 +186,63 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
     kPlusOneItemset
   }
 
+  private def genNextFreqItemsets1(
+                                    sc: SparkContext,
+                                    kItemsetRDD: RDD[(Set[Int], List[Int], Int)],
+                                    countMapBV: Broadcast[collection.Map[Int, Int]],
+                                    freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
+                                    kItemsBV: Broadcast[Array[Set[Int]]],
+                                    freqItemsSize: Int,
+                                    totalCount: Int,
+                                    minCount: Int
+                                  ): RDD[(Set[Int], List[Int], Int)] = {
+    val res = kItemsetRDD.repartition(sc.defaultParallelism).flatMap { case (kItems, line, count) =>
+      val kItemsSet = kItemsBV.value
+      val candidates = mutable.HashSet.empty[Int]
+      Range(kItems.max + 1, freqItemsSize).foreach(candidates.add)
+      candidates --= kItems
+      val temp = kItems.toList
+      val len = temp.length
+      var i = 0
+      while (candidates.nonEmpty && i < len) {
+        val subSet = kItems - temp(i)
+        candidates.toList.foreach { i =>
+          if (!kItemsSet.contains(subSet + i))
+            candidates -= i
+        }
+        i += 1
+      }
+      val kPlusOneItemset = candidates.toArray.map { i =>
+        val countMap = countMapBV.value
+        val freqItemsTrans = freqItemsTransBV.value
+        val x = new Array[Boolean](totalCount)
+        val y = freqItemsTrans(i)
+        line.foreach(x(_) = true)
+        val indexes = Range(0, totalCount)
+          .filter (i => x(i) && y(i)).toList
+        var iCount = 0
+        indexes.foreach(iCount += countMap(_))
+        if (iCount >= minCount) (kItems + i, indexes, iCount)
+        else (Set.empty[Int], List.empty[Int], 0)
+      }.filter(_._3 != 0)
+
+      kPlusOneItemset
+    }.persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    res
+  }
+
   private def genNextFreqItemsets2(
                                     sc: SparkContext,
-                                   kItemsetRDD: RDD[(Set[Int], Array[Boolean], Int)],
-                                   countMapBV: Broadcast[collection.Map[Int, Int]],
-                                   freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
-                                   kItemsBV: Broadcast[Array[Set[Int]]],
-                                   freqItemsSize: Int,
-                                   totalCount: Int,
-                                   minCount: Int
-                                 ): RDD[(Set[Int], Array[Boolean], Int)] = {
-    val res = kItemsetRDD.flatMap { case (kItems, line, count) =>
+                                    kItemsetRDD: RDD[(Set[Int], Array[Boolean], Int)],
+                                    countMapBV: Broadcast[collection.Map[Int, Int]],
+                                    freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
+                                    kItemsBV: Broadcast[Array[Set[Int]]],
+                                    freqItemsSize: Int,
+                                    totalCount: Int,
+                                    minCount: Int
+                                  ): RDD[(Set[Int], Array[Boolean], Int)] = {
+    val res = kItemsetRDD.repartition(sc.defaultParallelism).flatMap { case (kItems, line, count) =>
       val kItemsSet = kItemsBV.value
       val candidates = mutable.HashSet.empty[Int]
       Range(kItems.max + 1, freqItemsSize).foreach(candidates.add)
@@ -303,7 +349,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
 
     println("==== 2 candidates items " + tuples.length)
 
-    val res = sc.parallelize(tuples.toList, sc.defaultParallelism * 4).map{t =>
+    val res = sc.parallelize(tuples.toList).map{t =>
       val countMap = countMapBV.value
       val freqItemsTrans = freqItemsTransBV.value
       val x = freqItemsTrans(t._1)
@@ -317,6 +363,37 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
       indexes.foreach(count += countMap(_))
       if (count >= minCount) (Set[Int](t._1, t._2), line, count)
       else (Set.empty[Int], Array.empty[Boolean], 0)
+    }.filter(_._3 != 0).persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    res
+  }
+
+  private def genTwoFreqItems1(
+                               sc: SparkContext,
+                               countMapBV: Broadcast[collection.Map[Int, Int]],
+                               freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
+                               freqItemsSize: Int,
+                               totalCount: Int,
+                               minCount: Int
+                             ): RDD[(Set[Int], List[Int], Int)] = {
+    val tuples = mutable.ListBuffer.empty[(Int, Int)]
+
+    for (i <- 0 until freqItemsSize - 1)
+      for (j <- i + 1 until freqItemsSize)
+        tuples.append((i, j))
+
+    println("==== 2 candidates items " + tuples.length)
+
+    val res = sc.parallelize(tuples.toList).map{t =>
+      val countMap = countMapBV.value
+      val freqItemsTrans = freqItemsTransBV.value
+      val x = freqItemsTrans(t._1)
+      val y = freqItemsTrans(t._2)
+      val indexes = Range(0, totalCount).filter(i =>x(i) && y(i)).toList
+      var count = 0
+      indexes.foreach(count += countMap(_))
+      if (count >= minCount) (Set[Int](t._1, t._2), indexes, count)
+      else (Set.empty[Int], List.empty[Int], 0)
     }.filter(_._3 != 0).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     res
