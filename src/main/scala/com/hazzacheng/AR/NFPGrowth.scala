@@ -35,14 +35,13 @@ class NFPGrowth(private var minSupport: Double, private var numPartitions: Int) 
            data: RDD[Array[String]]
          ): Unit/*(RDD[(Array[String], Int)], mutable.HashMap[String, Int])*/ = {
     val count = data.count()
-    var minCount = math.ceil(minSupport * count).toInt
+    val minCount = math.ceil(minSupport * count).toInt
     val numParts = if (numPartitions > 0) numPartitions else data.partitions.length
     val partitioner = new HashPartitioner(numParts)
     val (freqItems, itemToRank, newData) = genFreqItems(sc, data, minCount, partitioner)
    // val newFreqItems = freqItems.indices.toArray
     val totalCount = newData.count().toInt
     data.unpersist()
-    minCount = math.ceil(minSupport * totalCount).toInt
     val freqItemsets = genFreqItemsets(sc, newData, totalCount, minCount, freqItems)
 
 //    (freqItemsets, itemToRank)

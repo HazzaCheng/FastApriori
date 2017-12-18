@@ -32,9 +32,8 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
     val partitioner = new HashPartitioner(numParts)
 
     val count = data.count()
-    var minCount = math.ceil(minSupport * count).toInt
+    val minCount = math.ceil(minSupport * count).toInt
     val (freqItems, itemToRank, newData, countMap, totalCount) = genFreqItems(sc, data, minCount, partitioner)
-    minCount = math.ceil(minSupport * totalCount).toInt
     val freqItemsets = genFreqItemsets(sc, newData, countMap, totalCount, minCount, freqItems)
 
     val time = System.currentTimeMillis()
@@ -142,13 +141,15 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
                                minCount: Int): Array[(Set[Int], Int)] = {
 
     val res = sc.parallelize(candidates).flatMap { case (subSet, items) =>
+//      val time = System.currentTimeMillis()
+
       val countMap = countMapBV.value
       val freqItemsTrans = freqItemsTransBV.value
       val common = subSet.toArray.map(freqItemsTrans(_))
       val commonArray = new Array[Boolean](totalCount)
       Range(0, totalCount).foreach(i => commonArray(i) = logicalAnd(i, common))
 
-      items.map { i =>
+      val right = items.map { i =>
         val iArray = freqItemsTrans(i)
         val indexes = Range(0, totalCount).filter(x => commonArray(x) && iArray(x))
         var count = 0
@@ -156,6 +157,10 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
         if (count >= minCount) (subSet + i, count)
         else (Set.empty[Int], 0)
       }.filter(_._2 != 0)
+
+//      println("Use Time " + (System.currentTimeMillis() - time) + " " + subSet + " " + items.length + " " + right.length)
+
+      right
     }.collect()
 
     res
