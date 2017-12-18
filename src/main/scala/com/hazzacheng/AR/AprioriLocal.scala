@@ -116,7 +116,7 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
       time = System.currentTimeMillis()
       val candidates = genCandidates(sc, kItems, freqItemsSize)
       println("==== " + k + " candidate items " + candidates.length)
-      val kItemsWithCount = genKFreqItemsets(sc, candidates, countMapBV, freqItemsTransBV, freqItemsSize, totalCount, minCount)
+      val kItemsWithCount = genNextFreqItemsets(sc, candidates, countMapBV, freqItemsTransBV, freqItemsSize, totalCount, minCount)
       freqItemsets ++= kItemsWithCount
       kItems = kItemsWithCount.map(_._1)
       println("==== " + k + " freq items " + kItems.length)
@@ -133,24 +133,30 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
     freqItemsets.toArray
   }
 
-  private def genKFreqItemsets(sc: SparkContext,
-                               candidates: Array[Set[Int]],
+  private def genNextFreqItemsets(sc: SparkContext,
+                               candidates: Array[(Set[Int], Array[Int])],
                                countMapBV: Broadcast[collection.Map[Int, Int]],
                                freqItemsTransBV: Broadcast[Map[Int, Array[Boolean]]],
                                freqItemsSize: Int,
                                totalCount: Int,
                                minCount: Int): Array[(Set[Int], Int)] = {
 
-    val res = sc.parallelize(candidates).map{x =>
+    val res = sc.parallelize(candidates).flatMap { case (subSet, items) =>
       val countMap = countMapBV.value
       val freqItemsTrans = freqItemsTransBV.value
-      val items = x.toArray.map(freqItemsTrans(_))
-      val indexes = Range(0, totalCount).filter(i => logicalAnd(i, items))
-      var count = 0
-      indexes.foreach(count += countMap(_))
-      if (count >= minCount) (x, count)
-      else (Set.empty[Int], 0)
-    }.filter(_._2 != 0).collect()
+      val common = subSet.toArray.map(freqItemsTrans(_))
+      val commonArray = new Array[Boolean](totalCount)
+      Range(0, totalCount).foreach(i => commonArray(i) = logicalAnd(i, common))
+
+      items.map { i =>
+        val iArray = freqItemsTrans(i)
+        val indexes = Range(0, totalCount).filter(x => commonArray(x) && iArray(x))
+        var count = 0
+        indexes.foreach(count += countMap(_))
+        if (count >= minCount) (subSet + i, count)
+        else (Set.empty[Int], 0)
+      }.filter(_._2 != 0)
+    }.collect()
 
     res
   }
@@ -164,13 +170,13 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
                              sc: SparkContext,
                              kItems: Array[Set[Int]],
                              freqItemsSize: Int
-                           ): Array[Set[Int]] = {
+                           ): Array[(Set[Int], Array[Int])] = {
     val kItemsSetBV = sc.broadcast(kItems.toSet)
-    val candidates = sc.parallelize(kItems).flatMap{x =>
+    val candidates = sc.parallelize(kItems).map{ x =>
 //      val time = System.currentTimeMillis()
       val kItemsSet = kItemsSetBV.value
       val candidates = mutable.HashSet.empty[Int]
-      Range(0, freqItemsSize).foreach(candidates.add)
+      Range(x.max + 1, freqItemsSize).foreach(candidates.add)
       candidates --= x
       val temp = x.toArray
       val len = temp.length
@@ -184,8 +190,8 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
         i += 1
       }
 //      println("==== Use Time" + (System.currentTimeMillis() - time) + " " + x)
-      candidates.toArray.map(x + _)
-    }.collect().distinct
+      (x, candidates.toArray)
+    }.filter(_._2.nonEmpty).collect()
 
     candidates
   }
