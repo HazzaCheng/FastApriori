@@ -1,4 +1,4 @@
-package com.hazzacheng.AR
+package com.hazzacheng.AR.fp_growth
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer

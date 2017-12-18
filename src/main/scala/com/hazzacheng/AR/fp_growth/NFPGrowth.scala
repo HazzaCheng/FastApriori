@@ -1,11 +1,11 @@
-package com.hazzacheng.AR
+package com.hazzacheng.AR.fp_growth
 
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{HashPartitioner, Partitioner, SparkContext}
 
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 
 /**
   * Created with IntelliJ IDEA.
