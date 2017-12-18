@@ -46,27 +46,24 @@ object Utils {
 */
   }
 
-  def formatOutput(freqItems: Array[FPGrowth.FreqItemset[String]],
-                   total: Long): Array[String] = {
-    val strs = freqItems.map{x =>
-      val percent = x.freq.toDouble / total
-      val str = x.items.mkString(",")
+  def getAll(sc: SparkContext) = {
+    val freqItemsetRDD = sc.textFile("/data/freqItemset")
+    val freqItemsRDD = sc.textFile("/data/freqItems")
+    val itemToRankRDD = sc.textFile("/data/itemToRank")
 
-      str// + " ( " + x.freq + " " + percent + " )"
-    }
 
-    strs
+    val itemToRankTP = mutable.HashMap.empty[String, Int]
+    itemToRankRDD.map(_.split(" ")).collect().foreach(x => itemToRankTP.put(x(0), x(1).toInt))
+    val freqItemsTP = freqItemsetRDD.collect().sortBy(itemToRankTP(_))
+
+    val freqItemsetTP = freqItemsetRDD.map{x =>
+      val whole = x.split(" ")
+      val count = whole.last.replace("[", "").replace("]", "")
+      (whole.init.map(itemToRankTP(_)).toSet, count.toInt)
+    }.collect()
+
+    (freqItemsetTP, itemToRankTP, freqItemsTP)
   }
 
-  def formattedSave(sc: SparkContext,
-                    path: String,
-                    freqItemsets: RDD[(Array[String], Int)],
-                    itemToRank: mutable.HashMap[String, Int]): Unit = {
-    val itemToRankBV = sc.broadcast(itemToRank)
-    freqItemsets.map{x =>
-      val itemToRank = itemToRankBV.value
-      x._1.sortBy(itemToRank(_)).mkString(" ")
-    }.saveAsTextFile(path)
-  }
 
 }

@@ -20,7 +20,6 @@ object Main {
 //      .set("spark.shuffle.compress", "true")
 //      .set("spark.shuffle.memoryFraction", "0.3")
 //      .set("spark.storage.memoryFraction", "0.5")
-
     conf.getAll.foreach(x => println("==== " + x))
 
     val sc = new SparkContext(conf)
@@ -28,10 +27,12 @@ object Main {
     val input = args(0)
     val output = args(1)
     val (dataRDD, userRDD) = Utils.readAsRDD(sc, input)
+  /*
     val (freqItemsets, itemToRank, freqItems) =
       new FastApriori(minSupport, sc.defaultParallelism).run(sc, dataRDD)
     Utils.saveFreqItemset(sc, output, freqItemsets, freqItems)
-    
+*/
+    val (freqItemsetTP, itemToRankTP, freqItemsTP) = Utils.getAll(sc)
   }
 }
 
