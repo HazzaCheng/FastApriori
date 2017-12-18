@@ -3,6 +3,8 @@ package com.hazzacheng.AR
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
+import scala.collection.mutable
+
 /**
   * Created with IntelliJ IDEA.
   * Description: 
@@ -15,7 +17,12 @@ class AssociationRules(
                         private val freqItemset: Array[(Set[Int], Int)]
                       ) {
 
-  def run(sc: SparkContext, userRDD: RDD[Array[String]]) = {
+  def run(
+           sc: SparkContext,
+           userRDD: RDD[Array[String]],
+           itemToRankTP: mutable.HashMap[String, Int],
+           freqItemsTP: Array[String]
+         ) = {
 
   }
 

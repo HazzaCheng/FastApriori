@@ -48,8 +48,8 @@ object Utils {
 
   def getAll(sc: SparkContext) = {
     val freqItemsetRDD = sc.textFile("/data/freqItemset")
-    val freqItemsRDD = sc.textFile("/data/freqItems")
-    val itemToRankRDD = sc.textFile("/data/itemToRank")
+    val freqItemsRDD = sc.textFile("/data/FreqItems")
+    val itemToRankRDD = sc.textFile("/data/ItemToRank")
 
 
     val itemToRankTP = mutable.HashMap.empty[String, Int]
