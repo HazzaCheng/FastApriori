@@ -72,7 +72,7 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
       (x.filter(freqItems.contains).map(itemToRank).toSet, 1)
     }.filter {
       case (transcation, count) =>
-        transcation.size > 1 //&& transcation.size < 200
+        transcation.size > 1 && transcation.size < 200
     }
       .reduceByKey(_ + _)
       .map(x => (x._1.toArray, x._2))
