@@ -27,7 +27,11 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
     this
   }
 
-  def run(sc: SparkContext, data: RDD[Array[String]], output: String) = {
+  def run(
+           sc: SparkContext,
+           data: RDD[Array[String]],
+           output: String
+         ): (Array[(Set[Int], Int)], mutable.HashMap[String, Int], Array[String]) = {
     val numParts = if (numPartitions > 0) numPartitions else data.partitions.length
     val partitioner = new HashPartitioner(numParts)
 
@@ -36,12 +40,7 @@ class Apriori(private var minSupport: Double, private var numPartitions: Int) ex
     val (freqItems, itemToRank, newData, countMap, totalCount) = genFreqItems(sc, data, minCount, partitioner)
     val freqItemsets = genFreqItemsets(sc, newData, countMap, totalCount, minCount, freqItems)
 
-    val time = System.currentTimeMillis()
-    val temp = freqItemsets.map{case (freqItemset, count) =>
-      freqItemset.toArray.sorted.map(freqItems(_)).mkString(" ") + " [" + count + "]"
-    }
-    println("==== Use Time change to string " + (System.currentTimeMillis() - time))
-    sc.parallelize(temp).saveAsTextFile(output)
+    (freqItemsets, itemToRank, freqItems)
   }
 
   private def genFreqItems(

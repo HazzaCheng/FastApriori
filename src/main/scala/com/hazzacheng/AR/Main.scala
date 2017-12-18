@@ -27,11 +27,11 @@ object Main {
     val minSupport = 0.092
     val input = args(0)
     val output = args(1)
-    val (dataRDD, userRDD) = utils.RddUtils.readAsRDD(sc, input)
-//    val (freqItemsets, itemToRank) =
-//    new NFPGrowth(minSupport).run(sc, dataRDD)
-    new AprioriLocal(minSupport, sc.defaultParallelism).run(sc, dataRDD, output)
-//    utils.RddUtils.formattedSave(sc, output, freqItemsets, itemToRank)
+    val (dataRDD, userRDD) = Utils.readAsRDD(sc, input)
+    val (freqItemsets, itemToRank, freqItems) =
+      new FastApriori(minSupport, sc.defaultParallelism).run(sc, dataRDD)
+    Utils.saveFreqItemset(sc, output, freqItemsets, freqItems)
+    
   }
 }
 

@@ -15,7 +15,7 @@ import scala.collection.mutable
   * Date: 17-12-17 
   * Time: 10:12 AM
   */
-class AprioriLocal(private var minSupport: Double, private var numPartitions: Int) extends Serializable {
+class FastApriori(private var minSupport: Double, private var numPartitions: Int) {
 
   def setMinSupport(minSupport: Double): this.type = {
     this.minSupport = minSupport
@@ -27,7 +27,10 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
     this
   }
 
-  def run(sc: SparkContext, data: RDD[Array[String]], output: String) = {
+  def run(
+           sc: SparkContext,
+           data: RDD[Array[String]]
+         ): (Array[(Set[Int], Int)], mutable.HashMap[String, Int], Array[String]) = {
     val numParts = if (numPartitions > 0) numPartitions else data.partitions.length
     val partitioner = new HashPartitioner(numParts)
 
@@ -36,12 +39,7 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
     val (freqItems, itemToRank, newData, countMap, totalCount) = genFreqItems(sc, data, minCount, partitioner)
     val freqItemsets = genFreqItemsets(sc, newData, countMap, totalCount, minCount, freqItems)
 
-    val time = System.currentTimeMillis()
-    val temp = freqItemsets.map{case (freqItemset, count) =>
-      freqItemset.toArray.sorted.map(freqItems(_)).mkString(" ") + " [" + count + "]"
-    }
-    println("==== Use Time change to string " + (System.currentTimeMillis() - time))
-    sc.parallelize(temp).saveAsTextFile(output)
+    (freqItemsets, itemToRank, freqItems)
   }
 
   private def genFreqItems(
@@ -138,8 +136,6 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
                                minCount: Int): Array[(Set[Int], Int)] = {
 
     val res = sc.parallelize(candidates).flatMap { case (subSet, items) =>
-//      val time = System.currentTimeMillis()
-
       val countMap = countMapBV.value
       val freqItemsTrans = freqItemsTransBV.value
       val common = subSet.toArray.map(freqItemsTrans(_))
@@ -154,8 +150,6 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
         if (count >= minCount) (subSet + i, count)
         else (Set.empty[Int], 0)
       }.filter(_._2 != 0)
-
-//      println("Use Time " + (System.currentTimeMillis() - time) + " " + subSet + " " + items.length + " " + right.length)
 
       right
     }.collect()
@@ -175,7 +169,6 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
                            ): Array[(Set[Int], Array[Int])] = {
     val kItemsSetBV = sc.broadcast(kItems.toSet)
     val candidates = sc.parallelize(kItems).map{ x =>
-//      val time = System.currentTimeMillis()
       val kItemsSet = kItemsSetBV.value
       val candidates = mutable.HashSet.empty[Int]
       Range(x.max + 1, freqItemsSize).foreach(candidates.add)
@@ -191,7 +184,6 @@ class AprioriLocal(private var minSupport: Double, private var numPartitions: In
         }
         i += 1
       }
-//      println("==== Use Time" + (System.currentTimeMillis() - time) + " " + x)
       (x, candidates.toArray)
     }.filter(_._2.nonEmpty).collect()
 
