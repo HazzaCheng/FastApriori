@@ -20,13 +20,10 @@ class AssociationRules(
                         private val itemToRank: mutable.HashMap[String, Int]
                       ) extends Serializable {
 
-  def run(
-           sc: SparkContext,
-           userRDD: RDD[Array[String]]
-         ) = {
+  def run(sc: SparkContext, userRDD: RDD[Array[String]]) = {
     val (newRDD, empty, indexesMap) = removeRedundancy(sc, userRDD)
     println("==== Size newRDD " + newRDD.count())
-    val recommends = (genAssociationRules(sc, newRDD, freqItems, indexesMap) ++ empty).sortBy(_._1)
+    val recommends = (genAssociationRules(sc, newRDD, indexesMap) ++ empty).sortBy(_._1)
 
     sc.parallelize(recommends).repartition(1).map(x => x._1 + " " + x._2).saveAsTextFile("/user_res")
 
@@ -35,14 +32,14 @@ class AssociationRules(
 
   def removeRedundancy(
                         sc: SparkContext,
-                        userRDD: RDD[Array[String]],
+                        userRDD: RDD[Array[String]]
                       ): (RDD[(Set[Int], Int)], Array[(Int, String)], collection.Map[Int, List[Int]]) = {
     val items = mutable.HashSet.empty[String]
     items ++= freqItems
     val itemsBV = sc.broadcast(items)
     val itemToRankBV = sc.broadcast(itemToRank)
 
-    val temp = userRDD.zipWithIndex().map{ case (line, index) =>
+    val temp = userRDD.zipWithIndex().map { case (line, index) =>
       val items = itemsBV.value
       val itemToRank = itemToRankBV.value
       val filtered = line.filter(items.contains).map(itemToRank).toSet
@@ -79,7 +76,7 @@ class AssociationRules(
     val freqItemsBV = sc.broadcast(freqItems)
     val indexesMapBV = sc.broadcast(indexesMap)
 
-    val recommends = newRDD.map { case (user, index) =>
+    val recommends = newRDD.flatMap { case (user, index) =>
 
       val time = System.currentTimeMillis()
 
@@ -97,36 +94,14 @@ class AssociationRules(
         val tmp = filtered(i)
         if ((tmp._1 & user).size == tmp._1.size) {
           recommend = tmp._2
+          flag = true
         }
-
         i += 1
       }
-
-      subToSuper.filter(_._1.size <= userLen).foreach { case (subset, comp) =>
-        val subsetLen = subset.size
-        if ((subset -- user).isEmpty) {
-          var flag = false
-          var i = 0
-          val len = comp.length
-          while (!flag && i < len) {
-            val tmp = comp(i)
-            if (!user.contains(tmp._1)) {
-              flag = true
-              if (tmp._2 > max ||
-                (tmp._2 == max && freqItems(tmp._1).toInt < freqItems(recommend).toInt)) {
-                max = tmp._2
-                recommend = tmp._1
-              }
-            }
-            i += 1
-          }
-        }
-      }
-
       println("==== Use Time " + (System.currentTimeMillis() - time) + " " + user)
 
-      if (recommend == -1) (index, "0")
-      else (index, freqItems(recommend))
+      if (flag) indexesMap(index).map(x => (x, freqItems(recommend)))
+      else indexesMap(index).map(x => (x, "0"))
     }.collect()
 
     subToSuperBV.unpersist()
@@ -150,7 +125,7 @@ class AssociationRules(
     val supersets = freqItemset.filter(_._1.size != minLen)
     val freqItemsetBV = sc.broadcast(grouped)
 
-    val subToSuper = sc.parallelize(supersets).flatMap{ case (superset, count) =>
+    val subToSuper = sc.parallelize(supersets).flatMap { case (superset, count) =>
 
       val time = System.currentTimeMillis()
 
@@ -178,6 +153,5 @@ class AssociationRules(
 
     subToSuper
   }
-
 
 }
