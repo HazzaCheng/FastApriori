@@ -32,15 +32,12 @@ object Utils {
                        freqItemsets: Array[(Set[Int], Int)],
                        freqItems: Array[String]
                      ): Unit = {
-    /*  val freqItemsBV = sc.broadcast(freqItems)
-      sc.parallelize(freqItemsets).map { f =>
-        val freqItemset = freqItemsBV.value
-        f._1.toArray.sortBy(-_).map(freqItemset(_)).mkString(" ")
-      }.repartition(1).sortBy(x => x).saveAsTextFile(output + "freqItems")
-      freqItemsBV.unpersist()*/
-    val strs = freqItemsets.map(f =>
-      f._1.toArray.sortBy(-_).map(freqItems(_)).mkString(" ")).sorted
-    sc.parallelize(strs).repartition(1).saveAsTextFile(output + "freqItems")
+    val freqItemsBV = sc.broadcast(freqItems)
+    sc.parallelize(freqItemsets).map { f =>
+      val freqItemset = freqItemsBV.value
+      f._1.toArray.sortBy(-_).map(freqItemset(_)).mkString(" ")
+    }.repartition(1).sortBy(x => x).saveAsTextFile(output + "freqItems")
+    freqItemsBV.unpersist()
   }
 
   def getAll(sc: SparkContext) = {
