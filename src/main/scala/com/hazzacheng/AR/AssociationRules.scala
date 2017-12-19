@@ -66,12 +66,12 @@ class AssociationRules(
   def genAssociationRules(
                            sc: SparkContext,
                            newRDD: RDD[(Set[Int], Int)],
-                           indexesMap: collection.Map[Int, scala.List[Int]]
+                           indexesMap: collection.Map[Int, List[Int]]
                          ): Array[(Int, String)] = {
     val grouped = freqItemset.groupBy(_._1.size)
-    val tiem = System.currentTimeMillis()
+    val time = System.currentTimeMillis()
     val subToSuper = genSuperSets(sc, grouped).sortWith(associationRulesSort).map(x => (x._1, x._2))
-    println("==== Use Time sort" + (System.currentTimeMillis() - tiem))
+    println("==== Use Time sort" + (System.currentTimeMillis() - time))
     val subToSuperBV = sc.broadcast(subToSuper)
     val freqItemsBV = sc.broadcast(freqItems)
     val indexesMapBV = sc.broadcast(indexesMap)
@@ -98,7 +98,7 @@ class AssociationRules(
         }
         i += 1
       }
-      println("==== Use Time " + (System.currentTimeMillis() - time) + " " + user)
+      println("==== Use Time " + (System.currentTimeMillis() - time) + " " + user + " " + filtered.length)
 
       if (flag) indexesMap(index).map(x => (x, freqItems(recommend)))
       else indexesMap(index).map(x => (x, "0"))
