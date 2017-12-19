@@ -15,17 +15,18 @@ import scala.collection.mutable
   * Time: 9:01 PM
   */
 class AssociationRules(
-                        private val freqItemset: Array[(Set[Int], Int)]
+                        private val freqItemset: Array[(Set[Int], Int)],
+                        private val freqItems: Array[String],
+                        private val itemToRank: mutable.HashMap[String, Int]
                       ) extends Serializable {
 
   def run(
            sc: SparkContext,
-           userRDD: RDD[Array[String]],
-           itemToRank: mutable.HashMap[String, Int],
-           freqItems: Array[String]
+           userRDD: RDD[Array[String]]
          ) = {
-    val (newRDD, empty) = removeRedundancy(sc, userRDD, itemToRank, freqItems)
-    val recommends = (genAssociationRules(sc, newRDD, freqItems) ++ empty).sortBy(_._1)
+    val (newRDD, empty, indexesMap) = removeRedundancy(sc, userRDD)
+    println("==== Size newRDD " + newRDD.count())
+    val recommends = (genAssociationRules(sc, newRDD, freqItems, indexesMap) ++ empty).sortBy(_._1)
 
     sc.parallelize(recommends).repartition(1).map(x => x._1 + " " + x._2).saveAsTextFile("/user_res")
 
@@ -35,9 +36,7 @@ class AssociationRules(
   def removeRedundancy(
                         sc: SparkContext,
                         userRDD: RDD[Array[String]],
-                        itemToRank: mutable.HashMap[String, Int],
-                        freqItems: Array[String]
-                      ): (RDD[(Set[Int], Int)], Array[(Int, String)]) = {
+                      ): (RDD[(Set[Int], Int)], Array[(Int, String)], collection.Map[Int, List[Int]]) = {
     val items = mutable.HashSet.empty[String]
     items ++= freqItems
     val itemsBV = sc.broadcast(items)
@@ -51,32 +50,57 @@ class AssociationRules(
     }.persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     val empty = temp.filter(_._1.isEmpty).map(x => (x._2, "0")).collect()
-    val newRDD = temp.filter(_._1.nonEmpty).persist(StorageLevel.MEMORY_AND_DISK_SER)
+    userRDD.unpersist()
+    val duplicates = temp.filter(_._1.nonEmpty)
+      .map(x => (x._1, List(x._2))).reduceByKey(_ ++ _)
+      .zipWithIndex()
+      .persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+    val indexesMap = duplicates.map(x => (x._2.toInt, x._1._2)).collectAsMap()
+    temp.unpersist()
+    val newRDD = duplicates.map(x => (x._1._1, x._2.toInt)).persist(StorageLevel.MEMORY_AND_DISK_SER)
 
     itemsBV.unpersist()
     itemToRankBV.unpersist()
 
-    (newRDD, empty)
+    (newRDD, empty, indexesMap)
   }
 
   def genAssociationRules(
                            sc: SparkContext,
                            newRDD: RDD[(Set[Int], Int)],
-                           freqItems: Array[String]
+                           indexesMap: collection.Map[Int, scala.List[Int]]
                          ): Array[(Int, String)] = {
-    val time = System.currentTimeMillis()
     val grouped = freqItemset.groupBy(_._1.size)
-    println("==== Use Time grouped " + (System.currentTimeMillis() - time))
-    val subToSuper = genSuperSets(sc, grouped)
+    val tiem = System.currentTimeMillis()
+    val subToSuper = genSuperSets(sc, grouped).sortWith(associationRulesSort).map(x => (x._1, x._2))
+    println("==== Use Time sort" + (System.currentTimeMillis() - tiem))
     val subToSuperBV = sc.broadcast(subToSuper)
     val freqItemsBV = sc.broadcast(freqItems)
+    val indexesMapBV = sc.broadcast(indexesMap)
 
     val recommends = newRDD.map { case (user, index) =>
+
+      val time = System.currentTimeMillis()
+
       var recommend = -1
-      var max: Double = 0.0
       val subToSuper = subToSuperBV.value
       val freqItems = freqItemsBV.value
+      val indexesMap = indexesMapBV.value
       val userLen = user.size
+      val filtered = subToSuper.filter(x => x._1.size <= userLen && !user.contains(x._2))
+
+      val len = filtered.length
+      var i = 0
+      var flag = false
+      while (!flag && i < len) {
+        val tmp = filtered(i)
+        if ((tmp._1 & user).size == tmp._1.size) {
+          recommend = tmp._2
+        }
+
+        i += 1
+      }
 
       subToSuper.filter(_._1.size <= userLen).foreach { case (subset, comp) =>
         val subsetLen = subset.size
@@ -99,33 +123,56 @@ class AssociationRules(
         }
       }
 
+      println("==== Use Time " + (System.currentTimeMillis() - time) + " " + user)
+
       if (recommend == -1) (index, "0")
       else (index, freqItems(recommend))
     }.collect()
 
     subToSuperBV.unpersist()
     freqItemsBV.unpersist()
+    indexesMapBV.unpersist()
 
     recommends
+  }
+
+  def associationRulesSort(x: (Set[Int], Int, Double), y: (Set[Int], Int, Double)): Boolean = {
+    if (x._3 > y._3) true
+    else if (x._3 < y._3) false
+    else freqItems(x._2).toInt < freqItems(y._2).toInt
   }
 
   def genSuperSets(
                     sc: SparkContext,
                     grouped: Map[Int, Array[(Set[Int], Int)]]
-                  ): Array[(Set[Int], Array[(Int, Double)])] = {
-    val maxLen = grouped.keys.max
-    val subsets = freqItemset.filter(_._1.size != maxLen)
+                  ): Array[(Set[Int], Int, Double)] = {
+    val minLen = grouped.keys.min
+    val supersets = freqItemset.filter(_._1.size != minLen)
     val freqItemsetBV = sc.broadcast(grouped)
-    val subToSuper = sc.parallelize(subsets).map{ case (subset, count) =>
-      val supersets = freqItemsetBV.value(subset.size + 1)
-      val complements = mutable.ListBuffer.empty[(Int, Double)]
-      supersets.foreach{ case (superset, sCount) =>
-        val comp = superset -- subset
-        if (comp.size == 1)
-          complements.append((comp.head, sCount.toDouble / count))
+
+    val subToSuper = sc.parallelize(supersets).flatMap{ case (superset, count) =>
+
+      val time = System.currentTimeMillis()
+
+      val subsets = freqItemsetBV.value(superset.size - 1)
+      val complements = mutable.ListBuffer.empty[(Set[Int], Int, Double)]
+      val targets = mutable.HashSet.empty[Set[Int]]
+      superset.foreach(i => targets.add(superset - i))
+      var i = 0
+      val subsetsLen = subsets.length
+      while (targets.nonEmpty && i < subsetsLen) {
+        val subset = subsets(i)
+        if (targets contains subset._1) {
+          complements.append((subset._1, (superset -- subset._1).head, count.toDouble / subset._2))
+          targets.remove(subset._1)
+        }
+        i += 1
       }
-      (subset, complements.toArray.sortBy(-_._2))
-    }.filter(_._2.nonEmpty).collect()
+
+      println("==== Use Time " + (System.currentTimeMillis() - time) + " " + supersets)
+
+      complements.toArray
+    }.collect()
 
     freqItemsetBV.unpersist()
 
