@@ -76,9 +76,11 @@ class AssociationRules(
       var max: Double = 0.0
       val subToSuper = subToSuperBV.value
       val freqItems = freqItemsBV.value
+      val userLen = user.size
 
       subToSuper.foreach { case (subset, comp) =>
-        if ((subset -- user).isEmpty) {
+        val subsetLen = subset.size
+        if (userLen >= subsetLen && (subset -- user).isEmpty) {
           var flag = false
           var i = 0
           val len = comp.length
@@ -92,6 +94,7 @@ class AssociationRules(
                 recommend = tmp._1
               }
             }
+            i += 1
           }
         }
       }
