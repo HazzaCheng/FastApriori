@@ -71,6 +71,7 @@ class AssociationRules(
     val grouped = freqItemset.groupBy(_._1.size)
     val time = System.currentTimeMillis()
     val subToSuper = genSuperSets(sc, grouped).sortBy(_._3).map(x => (x._1, x._2))
+    println("==== Size association rules " + subToSuper.length)
     println("==== Use Time sort" + (System.currentTimeMillis() - time))
     val subToSuperBV = sc.broadcast(subToSuper)
     val freqItemsBV = sc.broadcast(freqItems)
