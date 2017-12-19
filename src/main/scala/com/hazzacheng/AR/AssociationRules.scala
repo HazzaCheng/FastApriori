@@ -78,9 +78,9 @@ class AssociationRules(
       val freqItems = freqItemsBV.value
       val userLen = user.size
 
-      subToSuper.foreach { case (subset, comp) =>
+      subToSuper.filter(_._1.size <= userLen).foreach { case (subset, comp) =>
         val subsetLen = subset.size
-        if (userLen >= subsetLen && (subset -- user).isEmpty) {
+        if ((subset -- user).isEmpty) {
           var flag = false
           var i = 0
           val len = comp.length
