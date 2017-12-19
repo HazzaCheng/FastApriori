@@ -70,7 +70,7 @@ class AssociationRules(
                          ): Array[(Int, String)] = {
     val grouped = freqItemset.groupBy(_._1.size)
     val time = System.currentTimeMillis()
-    val subToSuper = genSuperSets(sc, grouped).sortWith(associationRulesSort).map(x => (x._1, x._2))
+    val subToSuper = genSuperSets(sc, grouped).sortBy(_._3).map(x => (x._1, x._2))
     println("==== Use Time sort" + (System.currentTimeMillis() - time))
     val subToSuperBV = sc.broadcast(subToSuper)
     val freqItemsBV = sc.broadcast(freqItems)
@@ -146,7 +146,7 @@ class AssociationRules(
 
       println("==== Use Time " + (System.currentTimeMillis() - time) + " " + supersets)
 
-      complements.toArray
+      complements.toList
     }.collect()
 
     freqItemsetBV.unpersist()
