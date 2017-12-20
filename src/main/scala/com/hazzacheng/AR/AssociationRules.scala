@@ -21,6 +21,7 @@ class AssociationRules(
                       ) extends Serializable {
 
   def run(sc: SparkContext, userRDD: RDD[Array[String]]) = {
+    println("==== Size userRDD " + userRDD.count())
     val (newRDD, empty, indexesMap) = removeRedundancy(sc, userRDD)
     println("==== Size newRDD " + newRDD.count())
     val recommends = (genAssociationRules(sc, newRDD, indexesMap) ++ empty).sortBy(_._1)
@@ -70,9 +71,9 @@ class AssociationRules(
                          ): Array[(Int, String)] = {
     val grouped = freqItemset.groupBy(_._1.size)
     val time = System.currentTimeMillis()
-    val subToSuper = genSuperSets(sc, grouped).sortBy(_._3).map(x => (x._1, x._2))
+    val subToSuper = genSuperSets(sc, grouped).sortWith(associationRulesSort).map(x => (x._1, x._2))
     println("==== Size association rules " + subToSuper.length)
-    println("==== Use Time sort" + (System.currentTimeMillis() - time))
+    println("==== Use Time sort " + (System.currentTimeMillis() - time))
     val subToSuperBV = sc.broadcast(subToSuper)
     val freqItemsBV = sc.broadcast(freqItems)
     val indexesMapBV = sc.broadcast(indexesMap)
@@ -123,12 +124,13 @@ class AssociationRules(
                     grouped: Map[Int, Array[(Set[Int], Int)]]
                   ): Array[(Set[Int], Int, Double)] = {
     val minLen = grouped.keys.min
+    val maxLen = grouped.keys.max
     val supersets = freqItemset.filter(_._1.size != minLen)
     val freqItemsetBV = sc.broadcast(grouped)
 
-    val subToSuper = sc.parallelize(supersets).flatMap { case (superset, count) =>
+    val rules = sc.parallelize(supersets).flatMap { case (superset, count) =>
 
-      val time = System.currentTimeMillis()
+    //  val time = System.currentTimeMillis()
 
       val subsets = freqItemsetBV.value(superset.size - 1)
       val complements = mutable.ListBuffer.empty[(Set[Int], Int, Double)]
@@ -145,14 +147,72 @@ class AssociationRules(
         i += 1
       }
 
-      println("==== Use Time " + (System.currentTimeMillis() - time) + " " + supersets)
+      //println("==== Use Time " + (System.currentTimeMillis() - time) + " " + supersets)
 
       complements.toList
+    }.groupBy(_._1.size).collectAsMap()
+
+    val realRules = mutable.ArrayBuffer.empty[(Set[Int], Int, Double)]
+    realRules ++= rules(minLen)
+    var lowLevel = rules(minLen).toArray
+    for (i <- (minLen + 1) to maxLen) {
+      val time = System.currentTimeMillis()
+      val subsetsBV = sc.broadcast(lowLevel.groupBy(_._2))
+
+      val filtered = sc.parallelize(rules(i).toArray).filter{ case (superset, recommend, confidence) =>
+        val subsets = subsetsBV.value(recommend)
+        val targets = mutable.HashSet.empty[Set[Int]]
+        superset.foreach(i => targets.add(superset - i))
+        var i = 0
+        var flag = true
+        val subsetsLen = subsets.length
+        while (flag && targets.nonEmpty && i < subsetsLen) {
+          val subset = subsets(i)
+          if (targets contains subset._1) {
+            if (subset._3 >= confidence) flag = false
+            targets.remove(subset._1)
+          }
+          i += 1
+        }
+        if (targets.nonEmpty) flag = false
+        flag
+      }.collect()
+      realRules ++= filtered
+      lowLevel = filtered
+      subsetsBV.unpersist()
+      println("==== Use Time cut leaves " + i + " Time: " + (System.currentTimeMillis() - time))
+    }
+
+
+     /*
+      .groupBy(_._2).flatMap{ case (recommend, grouped) =>
+      val right = mutable.ListBuffer.empty[(Set[Int], Int, Double)]
+      val time = System.currentTimeMillis()
+      grouped.toArray.sortBy(_._2).foreach(right.append(_))
+      println("==== Use Time sort group " + recommend + " Time: " + (System.currentTimeMillis() - time))
+      var len = right.length
+      var i = 0
+      while (i < len - 1) {
+        val smaller = right(i)
+        var j = i + 1
+        while (j < len) {
+            val tmp = right(j)
+            if (smaller._1.size < tmp._1.size && (smaller._1 -- tmp._1).isEmpty) {
+              right.remove(j)
+              len -= 1
+            } else j += 1
+        }
+        i += 1
+      }
+      println("==== Use Time cut leaves " + recommend + " Time: " + (System.currentTimeMillis() - time))
+
+      right.toList
     }.collect()
+*/
 
     freqItemsetBV.unpersist()
 
-    subToSuper
+    realRules.toArray
   }
 
 }
