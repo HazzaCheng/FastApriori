@@ -71,7 +71,7 @@ class AssociationRules(
                          ): Array[(Int, String)] = {
     val grouped = freqItemset.groupBy(_._1.size)
     val time = System.currentTimeMillis()
-    val rules = genSuperSets(sc, grouped).sortWith(associationRulesSort).map(x => (x._1, x._2))
+    val rules = genRules(sc, grouped).sortWith(associationRulesSort).map(x => (x._1, x._2))
     println("==== Size association rules " + rules.length)
     println("==== Use Time sort " + (System.currentTimeMillis() - time))
     val rulesBV = sc.broadcast(rules)
@@ -119,13 +119,11 @@ class AssociationRules(
     else freqItems(x._2).toInt < freqItems(y._2).toInt
   }
 
-  def genSuperSets(
+  def genRules(
                     sc: SparkContext,
                     grouped: Map[Int, Array[(Set[Int], Int)]]
                   ): Array[(Set[Int], Int, Double)] = {
-    val minLen = grouped.keys.min
-    val maxLen = grouped.keys.max
-    val supersets = freqItemset.filter(_._1.size != minLen)
+    val supersets = freqItemset.filter(_._1.size != 1)
     val freqItemsetBV = sc.broadcast(grouped)
 
     val rules = sc.parallelize(supersets).flatMap { case (superset, count) =>
@@ -152,6 +150,8 @@ class AssociationRules(
       complements.toList
     }.groupBy(_._1.size).collectAsMap()
 
+    val minLen = rules.keys.min
+    val maxLen = rules.keys.max
     val realRules = mutable.ArrayBuffer.empty[(Set[Int], Int, Double)]
     realRules ++= rules(minLen)
     var lowLevel = rules(minLen).toArray
