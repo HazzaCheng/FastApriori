@@ -43,8 +43,7 @@ class FastApriori(private var minSupport: Double, private var numPartitions: Int
     (freqItemsets, itemToRank, freqItems)
   }
 
-  private def genFreqItems(
-                            sc: SparkContext,
+  private def genFreqItems(sc: SparkContext,
                             data: RDD[Array[String]],
                             minCount: Long,
                             partitioner: Partitioner
@@ -68,7 +67,7 @@ class FastApriori(private var minSupport: Double, private var numPartitions: Int
       val freqItems = freqItemsBV.value
       val itemToRank = itemToRankBV.value
       (x.filter(freqItems.contains).map(itemToRank).toSet, 1)
-    }.filter(_._1.size > 1)
+    }.filter(x => x._1.size > 1)
       .reduceByKey(_ + _)
       .map(x => (x._1.toArray, x._2))
       .zipWithIndex()

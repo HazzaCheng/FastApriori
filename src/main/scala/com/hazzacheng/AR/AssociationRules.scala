@@ -8,10 +8,10 @@ import scala.collection.mutable
 
 /**
   * Created with IntelliJ IDEA.
-  * Description: 
+  * Description:
   * User: HazzaCheng
   * Contact: hazzacheng@gmail.com
-  * Date: 17-12-18 
+  * Date: 17-12-18
   * Time: 9:01 PM
   */
 class AssociationRules(
@@ -64,14 +64,13 @@ class AssociationRules(
     (newRDD, empty, indexesMap)
   }
 
-  def genAssociationRules(
-                           sc: SparkContext,
-                           newRDD: RDD[(Set[Int], Int)],
-                           indexesMap: collection.Map[Int, List[Int]]
+  def genAssociationRules(sc: SparkContext,
+                          newRDD: RDD[(Set[Int], Int)],
+                          indexesMap: collection.Map[Int, List[Int]]
                          ): Array[(Int, String)] = {
     val grouped = freqItemset.groupBy(_._1.size)
     val time = System.currentTimeMillis()
-    val rules = genRules(sc, grouped).sortWith(associationRulesSort).map(x => (x._1, x._2))
+    val rules = genRules(sc, grouped).sortWith(associationRulesSort).map(x => (x._1, x._2, x._1.size))
     println("==== Size association rules " + rules.length)
     println("==== Use Time sort " + (System.currentTimeMillis() - time))
     val rulesBV = sc.broadcast(rules)
@@ -87,7 +86,13 @@ class AssociationRules(
       val freqItems = freqItemsBV.value
       val indexesMap = indexesMapBV.value
       val userLen = user.size
-      val filtered = rules.filter(x => x._1.size <= userLen && !user.contains(x._2))
+      var time_1 = System.currentTimeMillis()
+
+      val temp = new Array[Boolean](300)
+      user.foreach(temp(_) = true)
+      val filtered = rules.filter(x => x._3 <= userLen && !temp(x._2))
+
+      println("==== Filtered use time: " + (System.currentTimeMillis() - time_1))
 
       val len = filtered.length
       var i = 0
@@ -112,6 +117,7 @@ class AssociationRules(
 
     recommends
   }
+
 
   def associationRulesSort(x: (Set[Int], Int, Double), y: (Set[Int], Int, Double)): Boolean = {
     if (x._3 > y._3) true

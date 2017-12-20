@@ -17,6 +17,8 @@ class FPTree extends Serializable {
   import FPTree._
 
   val root: Node = new Node(null)
+  val suffixItems = new mutable.ArrayBuffer[Int]()
+  val allFreqItems = new mutable.ArrayBuffer[Array[Int]]
 
   private val summaries = mutable.Map.empty[Int, Summary]
 
@@ -101,6 +103,91 @@ class FPTree extends Serializable {
         Iterator.empty
       }
     }
+  }
+
+  def extract_imrpove(minCount: Int): Array[Array[Int]] = {
+    val highItem = suffixItems.toArray.min
+    val lowItem = suffixItems.toArray.max
+    val highNode = summaries(highItem).nodes.toArray
+    val count = summaries(lowItem).nodes.toArray
+    mine(highNode, count, suffixItems.toArray, minCount)
+    allFreqItems.toArray
+  }
+
+  def mine(node: Array[Node], count: Array[Node],
+           curItems: Array[Int], minCount: Int):Unit = {
+    val (itemsAndCount, itemsExistMap) = getItemsAndCount(node, count, minCount)
+    val items = itemsAndCount.keys.toArray
+    if(itemsAndCount.isEmpty)return
+    if(itemsAndCount.size == 1){
+      allFreqItems += curItems ++ items
+      return
+    }
+    if(node.length == 1){
+      // 生成任意组合
+      genAllfreqItems(items, curItems)
+      return
+    }
+    val (freqSingleItem, freqItems) = genKFreqItems(node, count, itemsAndCount, itemsExistMap, curItems, minCount)
+    allFreqItems ++= freqItems
+    for(i <- freqSingleItem){
+      val highNode = summaries(i).nodes.toArray
+      if(highNode.nonEmpty){
+        mine(highNode, count, curItems ++ Array(i), minCount)
+      }
+    }
+  }
+
+  def genAllfreqItems(nums: Array[Int], curItems: Array[Int]): Unit = {
+    val numsLen = nums.length
+    val subsetLen = 1 << numsLen
+
+    for (i <- 0 until subsetLen) {
+      val subSet = mutable.Set.empty[Int]
+      for (j <- 0 until numsLen) {
+        if (((i >> j) & 1) != 0) subSet += nums(j)
+      }
+      if (subSet.nonEmpty) allFreqItems += subSet.toArray ++ curItems
+    }
+
+  }
+
+  def genKFreqItems(node: Array[Node], count: Array[Node],
+                    itemsAndCount: Map[Int, Int],
+                    itemsExistMap: mutable.HashMap[Int, mutable.HashMap[Int, Boolean]],
+                    curItems: Array[Int],
+                    minCount: Int) = {
+    val candidateItem = itemsAndCount.keys.toArray
+    val candidateItemAndCount = mutable.HashMap.empty[Int, Int]
+    for(i <- candidateItem.indices){
+      for(j <- node.indices){
+        if(itemsExistMap(j).contains(candidateItem(i))){
+          var c = candidateItemAndCount.getOrElseUpdate(candidateItem(i), 0)
+          c += count(j).count
+          candidateItemAndCount.update(i, c)
+        }
+      }
+    }
+    val freqSingleItem = candidateItemAndCount.toList.filter(_._2 >= minCount).map(_._1)
+    val freqItems = freqSingleItem.map(x => Array(x) ++ curItems).toArray
+    (freqSingleItem, freqItems)
+  }
+
+  def getItemsAndCount(node: Array[Node], count: Array[Node], minCount: Int) = {
+    val itemsAndCount = mutable.HashMap.empty[Int, Int]
+    val itemsExistMap = mutable.HashMap.empty[Int, mutable.HashMap[Int, Boolean]]
+    for(i <- node.indices){
+      var curNode = node(i).parent
+      itemsExistMap += i -> mutable.HashMap.empty[Int, Boolean]
+      while(!curNode.isRoot){
+        itemsExistMap(i) += curNode.item -> true
+        var value = itemsAndCount.getOrElseUpdate(curNode.item, 0)
+        value += count(i).count
+        itemsAndCount.update(curNode.item, value)
+        curNode = curNode.parent
+      }
+    }
+    (itemsAndCount.toList.filter(_._2 >= minCount).toMap, itemsExistMap)
   }
 
 }
