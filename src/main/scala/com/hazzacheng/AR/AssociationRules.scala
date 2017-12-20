@@ -158,7 +158,7 @@ class AssociationRules(
     for (i <- (minLen + 1) to maxLen) {
       val time = System.currentTimeMillis()
       val subsetsBV = sc.broadcast(lowLevel.groupBy(_._2))
-
+      println("==== Before cut level " + i + " Nums: " + rules(i).size)
       val filtered = sc.parallelize(rules(i).toList).filter{ case (superset, recommend, confidence) =>
         val tmp = subsetsBV.value
         var flag = true
@@ -180,6 +180,7 @@ class AssociationRules(
         } else flag = false
         flag
       }.collect()
+      println("==== After cut level " + i + " Nums: " + filtered.size)
       realRules ++= filtered
       lowLevel = filtered
       subsetsBV.unpersist()
