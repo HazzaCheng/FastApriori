@@ -159,22 +159,25 @@ class AssociationRules(
       val time = System.currentTimeMillis()
       val subsetsBV = sc.broadcast(lowLevel.groupBy(_._2))
 
-      val filtered = sc.parallelize(rules(i).toArray).filter{ case (superset, recommend, confidence) =>
-        val subsets = subsetsBV.value(recommend)
-        val targets = mutable.HashSet.empty[Set[Int]]
-        superset.foreach(i => targets.add(superset - i))
-        var i = 0
+      val filtered = sc.parallelize(rules(i).toList).filter{ case (superset, recommend, confidence) =>
+        val tmp = subsetsBV.value
         var flag = true
-        val subsetsLen = subsets.length
-        while (flag && targets.nonEmpty && i < subsetsLen) {
-          val subset = subsets(i)
-          if (targets contains subset._1) {
-            if (subset._3 >= confidence) flag = false
-            targets.remove(subset._1)
+        if (tmp contains recommend) {
+          val subsets = subsetsBV.value(recommend)
+          val targets = mutable.HashSet.empty[Set[Int]]
+          superset.foreach(i => targets.add(superset - i))
+          var i = 0
+          val subsetsLen = subsets.length
+          while (flag && targets.nonEmpty && i < subsetsLen) {
+            val subset = subsets(i)
+            if (targets contains subset._1) {
+              if (subset._3 >= confidence) flag = false
+              targets.remove(subset._1)
+            }
+            i += 1
           }
-          i += 1
-        }
-        if (targets.nonEmpty) flag = false
+          if (targets.nonEmpty) flag = false
+        } else flag = false
         flag
       }.collect()
       realRules ++= filtered
