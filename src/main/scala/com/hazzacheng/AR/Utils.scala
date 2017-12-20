@@ -65,9 +65,8 @@ object Utils {
     val freqItemsTP = freqItemsRDD.collect().sortBy(itemToRankTP(_))
 
     val freqItemsetTP = freqItemsetRDD.map{x =>
-      val whole = x.split(" ")
-      val count = whole.last.replace("[", "").replace("]", "")
-      (whole.init.map(itemToRankTP(_)).toSet, count.toInt)
+      val whole = x.replace("[", " ").replace("]", "").split(" ")
+      (whole.init.map(itemToRankTP(_)).toSet, whole.last.toInt)
     }.collect()
 
     (freqItemsetTP, itemToRankTP, freqItemsTP)
