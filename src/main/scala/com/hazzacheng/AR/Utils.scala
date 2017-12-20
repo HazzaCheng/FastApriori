@@ -40,6 +40,20 @@ object Utils {
     freqItemsBV.unpersist()
   }
 
+  def saveFreqItemsetWithCount(
+                       sc: SparkContext,
+                       output: String,
+                       freqItemsets: Array[(Set[Int], Int)],
+                       freqItems: Array[String]
+                     ): Unit = {
+    val freqItemsBV = sc.broadcast(freqItems)
+    sc.parallelize(freqItemsets).map { f =>
+      val freqItemset = freqItemsBV.value
+      f._1.toArray.sortBy(-_).map(freqItemset(_)).mkString(" ") + "[" + f._2 + "]"
+    }.repartition(1).sortBy(x => x).saveAsTextFile(output + "freqItems")
+    freqItemsBV.unpersist()
+  }
+
   def getAll(sc: SparkContext) = {
     val freqItemsetRDD = sc.textFile("/data/freqItemset")
     val freqItemsRDD = sc.textFile("/data/FreqItems")

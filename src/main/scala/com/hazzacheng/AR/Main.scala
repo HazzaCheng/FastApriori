@@ -27,11 +27,11 @@ object Main {
     val input = args(0)
     val output = args(1)
     val (dataRDD, userRDD) = Utils.readAsRDD(sc, input)
-  /*
-    val (freqItemsets, itemToRank, freqItems) =
-      new FastApriori(minSupport, sc.defaultParallelism).run(sc, dataRDD)
-    Utils.saveFreqItemset(sc, output, freqItemsets, freqItems)
-*/
+
+//    val (freqItemsets, itemToRank, freqItems) =
+//      new FastApriori(minSupport, sc.defaultParallelism).run(sc, dataRDD)
+//    Utils.saveFreqItemsetWithCount(sc, output, freqItemsets, freqItems)
+
     val (freqItemsetTP, itemToRankTP, freqItemsTP) = Utils.getAll(sc)
     new AssociationRules(freqItemsetTP, freqItemsTP, itemToRankTP).run(sc, userRDD)
   }
