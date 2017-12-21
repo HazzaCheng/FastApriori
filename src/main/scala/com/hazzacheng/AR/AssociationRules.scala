@@ -24,7 +24,8 @@ class AssociationRules(
     println("==== Size userRDD " + userRDD.count())
     val (newRDD, empty, indexesMap) = removeRedundancy(sc, userRDD)
     println("==== Size newRDD " + newRDD.count())
-    val recommends = (genAssociationRules(sc, newRDD, indexesMap) ++ empty).sortBy(_._1)
+    val freqItemsSize = freqItems.length
+    val recommends = (genAssociationRules(sc, newRDD, indexesMap, freqItemsSize) ++ empty).sortBy(_._1)
 
     sc.parallelize(recommends).repartition(1).map(x => x._1 + " " + x._2).saveAsTextFile("/user_res")
 
@@ -66,7 +67,8 @@ class AssociationRules(
 
   def genAssociationRules(sc: SparkContext,
                           newRDD: RDD[(Set[Int], Int)],
-                          indexesMap: collection.Map[Int, List[Int]]
+                          indexesMap: collection.Map[Int, List[Int]],
+                          freqItemsSize: Int
                          ): Array[(Int, String)] = {
     val grouped = freqItemset.groupBy(_._1.size)
     val time = System.currentTimeMillis()
@@ -88,7 +90,7 @@ class AssociationRules(
       val userLen = user.size
       var time_1 = System.currentTimeMillis()
 
-      val temp = new Array[Boolean](300)
+      val temp = new Array[Boolean](freqItemsSize)
       user.foreach(temp(_) = true)
       val filtered = rules.filter(x => x._3 <= userLen && !temp(x._2))
 
@@ -193,32 +195,6 @@ class AssociationRules(
       println("==== Use Time cut leaves " + i + " Time: " + (System.currentTimeMillis() - time))
     }
 
-
-     /*
-      .groupBy(_._2).flatMap{ case (recommend, grouped) =>
-      val right = mutable.ListBuffer.empty[(Set[Int], Int, Double)]
-      val time = System.currentTimeMillis()
-      grouped.toArray.sortBy(_._2).foreach(right.append(_))
-      println("==== Use Time sort group " + recommend + " Time: " + (System.currentTimeMillis() - time))
-      var len = right.length
-      var i = 0
-      while (i < len - 1) {
-        val smaller = right(i)
-        var j = i + 1
-        while (j < len) {
-            val tmp = right(j)
-            if (smaller._1.size < tmp._1.size && (smaller._1 -- tmp._1).isEmpty) {
-              right.remove(j)
-              len -= 1
-            } else j += 1
-        }
-        i += 1
-      }
-      println("==== Use Time cut leaves " + recommend + " Time: " + (System.currentTimeMillis() - time))
-
-      right.toList
-    }.collect()
-*/
 
     freqItemsetBV.unpersist()
 
