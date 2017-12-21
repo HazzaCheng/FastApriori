@@ -20,16 +20,17 @@ class AssociationRules(
                         private val itemToRank: mutable.HashMap[String, Int]
                       ) extends Serializable {
 
-  def run(sc: SparkContext, userRDD: RDD[Array[String]]) = {
+  def run(sc: SparkContext, userRDD: RDD[Array[String]]): Array[(Int, String)] = {
     println("==== Size userRDD " + userRDD.count())
     val (newRDD, empty, indexesMap) = removeRedundancy(sc, userRDD)
     println("==== Size newRDD " + newRDD.count())
     val freqItemsSize = freqItems.length
     val recommends = genAssociationRules(sc, newRDD, indexesMap, freqItemsSize) ++ empty
 
-    sc.parallelize(recommends).repartition(1).sortBy(_._1).map(x => x._1 + " " + x._2).saveAsTextFile("/user_res")
+//    sc.parallelize(recommends).repartition(1).sortBy(_._1).map(x => x._1 + " " + x._2).saveAsTextFile("/user_res")
 
     //newRDD.map(_._1.mkString(" ")).saveAsTextFile("/user_res")
+    recommends
   }
 
   def removeRedundancy(
@@ -71,10 +72,11 @@ class AssociationRules(
                           freqItemsSize: Int
                          ): Array[(Int, String)] = {
     val grouped = freqItemset.groupBy(_._1.size)
+    val rules1 = genRules(sc, grouped)//.sortWith(associationRulesSort).map(x => (x._1, x._2, x._1.size))
     val time = System.currentTimeMillis()
-    val rules = genRules(sc, grouped).sortWith(associationRulesSort).map(x => (x._1, x._2, x._1.size))
-    println("==== Size association rules " + rules.length)
+    val rules = rules1.sortWith(associationRulesSort).map(x => (x._1, x._2, x._1.size))
     println("==== Use Time sort " + (System.currentTimeMillis() - time))
+    println("==== Size association rules " + rules.length)
     val rulesBV = sc.broadcast(rules)
     val freqItemsBV = sc.broadcast(freqItems)
     val indexesMapBV = sc.broadcast(indexesMap)

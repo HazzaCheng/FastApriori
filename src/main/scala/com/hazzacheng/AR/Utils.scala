@@ -40,6 +40,14 @@ object Utils {
     freqItemsBV.unpersist()
   }
 
+  def saveRecommends(
+                       sc: SparkContext,
+                       output: String,
+                       recommends: Array[(Int, String)]
+                     ): Unit = {
+    sc.parallelize(recommends).repartition(1).sortBy(_._1).map(_._2).saveAsTextFile(output + "recommends")
+  }
+
   def saveFreqItemsetWithCount(
                        sc: SparkContext,
                        output: String,
