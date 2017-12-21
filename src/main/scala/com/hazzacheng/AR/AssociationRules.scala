@@ -25,9 +25,9 @@ class AssociationRules(
     val (newRDD, empty, indexesMap) = removeRedundancy(sc, userRDD)
     println("==== Size newRDD " + newRDD.count())
     val freqItemsSize = freqItems.length
-    val recommends = (genAssociationRules(sc, newRDD, indexesMap, freqItemsSize) ++ empty).sortBy(_._1)
+    val recommends = genAssociationRules(sc, newRDD, indexesMap, freqItemsSize) ++ empty
 
-    sc.parallelize(recommends).repartition(1).map(x => x._1 + " " + x._2).saveAsTextFile("/user_res")
+    sc.parallelize(recommends).repartition(1).sortBy(_._1).map(x => x._1 + " " + x._2).saveAsTextFile("/user_res")
 
     //newRDD.map(_._1.mkString(" ")).saveAsTextFile("/user_res")
   }

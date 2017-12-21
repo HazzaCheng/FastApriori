@@ -36,7 +36,7 @@ object Utils {
     sc.parallelize(freqItemsets).map { f =>
       val freqItemset = freqItemsBV.value
       f._1.toArray.sortBy(-_).map(freqItemset(_)).mkString(" ")
-    }.repartition(1).sortBy(x => x).saveAsTextFile(output + "freqItems")
+    }.repartition(1).sortBy(x => x).saveAsTextFile(output + "freqItemset")
     freqItemsBV.unpersist()
   }
 
@@ -55,9 +55,9 @@ object Utils {
   }
 
   def getAll(sc: SparkContext) = {
-    val freqItemsetRDD = sc.textFile("/data/freqItemset")
-    val freqItemsRDD = sc.textFile("/data/FreqItems")
-    val itemToRankRDD = sc.textFile("/data/ItemsToRank")
+    val freqItemsetRDD = sc.textFile("/user/sklcc/data/freqItemset")
+    val freqItemsRDD = sc.textFile("/user/sklcc/data/FreqItems")
+    val itemToRankRDD = sc.textFile("/user/sklcc/data/ItemsToRank")
 
 
     val itemToRankTP = mutable.HashMap.empty[String, Int]

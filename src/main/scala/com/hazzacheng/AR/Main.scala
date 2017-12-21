@@ -14,12 +14,8 @@ import org.apache.spark.{SparkConf, SparkContext}
 object Main {
   def main(args: Array[String]) {
     val conf = new SparkConf()
-//      .set("spark.rdd.compress", "true")
       .set("spark.speculation", "true")
-      .set("spark.default.parallelism", "180")
-//      .set("spark.shuffle.compress", "true")
-//      .set("spark.shuffle.memoryFraction", "0.3")
-//      .set("spark.storage.memoryFraction", "0.5")
+      .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     conf.getAll.foreach(x => println("==== " + x))
 
     val sc = new SparkContext(conf)
