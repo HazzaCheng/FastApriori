@@ -25,14 +25,16 @@ object Main {
     val output = args(1)
     val (dataRDD, userRDD) = Utils.readAsRDD(sc, input)
 
+    val time1 = System.currentTimeMillis()
     val (freqItemsets, itemToRank, freqItems) =
       new FastApriori(minSupport, sc.defaultParallelism).run(sc, dataRDD)
-    Utils.saveFreqItemsetWithCount(sc, output, freqItemsets, freqItems)
+    Utils.saveFreqItemset(sc, output, freqItemsets, freqItems)
+    println("==== Total time for get freqItemsets " + (System.currentTimeMillis() - time1))
 
-//    val (freqItemsetTP, itemToRankTP, freqItemsTP) = Utils.getAll(sc)
-//    new AssociationRules(freqItemsetTP, freqItemsTP, itemToRankTP).run(sc, userRDD)
+    val time2 = System.currentTimeMillis()
     val recommends = new AssociationRules(freqItemsets, freqItems, itemToRank).run(sc, userRDD)
     Utils.saveRecommends(sc, output, recommends)
+    println("==== Total time for get recommends " + (System.currentTimeMillis() - time2))
   }
 }
 

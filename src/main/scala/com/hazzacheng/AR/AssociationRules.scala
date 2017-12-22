@@ -21,15 +21,12 @@ class AssociationRules(
                       ) extends Serializable {
 
   def run(sc: SparkContext, userRDD: RDD[Array[String]]): Array[(Int, String)] = {
-    println("==== Size userRDD " + userRDD.count())
+//    println("==== Size userRDD " + userRDD.count())
     val (newRDD, empty, indexesMap) = removeRedundancy(sc, userRDD)
-    println("==== Size newRDD " + newRDD.count())
+//    println("==== Size newRDD " + newRDD.count())
     val freqItemsSize = freqItems.length
     val recommends = genAssociationRules(sc, newRDD, indexesMap, freqItemsSize) ++ empty
 
-//    sc.parallelize(recommends).repartition(1).sortBy(_._1).map(x => x._1 + " " + x._2).saveAsTextFile("/user_res")
-
-    //newRDD.map(_._1.mkString(" ")).saveAsTextFile("/user_res")
     recommends
   }
 
@@ -75,16 +72,12 @@ class AssociationRules(
     val rules1 = genRules(sc, grouped)//.sortWith(associationRulesSort).map(x => (x._1, x._2, x._1.size))
     val time = System.currentTimeMillis()
     val rules = rules1.sortWith(associationRulesSort).map(x => (x._1, x._2, x._1.size))
-    println("==== Use Time sort " + (System.currentTimeMillis() - time))
     println("==== Size association rules " + rules.length)
     val rulesBV = sc.broadcast(rules)
     val freqItemsBV = sc.broadcast(freqItems)
     val indexesMapBV = sc.broadcast(indexesMap)
 
     val recommends = newRDD.flatMap { case (user, index) =>
-
-      val time = System.currentTimeMillis()
-
       var recommend = -1
       val rules = rulesBV.value
       val freqItems = freqItemsBV.value
@@ -95,8 +88,6 @@ class AssociationRules(
       val temp = new Array[Boolean](freqItemsSize)
       user.foreach(temp(_) = true)
       val filtered = rules.filter(x => x._3 <= userLen && !temp(x._2))
-
-      println("==== Filtered use time: " + (System.currentTimeMillis() - time_1))
 
       val len = filtered.length
       var i = 0
@@ -109,7 +100,6 @@ class AssociationRules(
         }
         i += 1
       }
-      println("==== Use Time " + (System.currentTimeMillis() - time) + " " + user + " " + filtered.length)
 
       if (flag) indexesMap(index).map(x => (x, freqItems(recommend)))
       else indexesMap(index).map(x => (x, "0"))
@@ -137,9 +127,6 @@ class AssociationRules(
     val freqItemsetBV = sc.broadcast(grouped)
 
     val rules = sc.parallelize(supersets).flatMap { case (superset, count) =>
-
-    //  val time = System.currentTimeMillis()
-
       val subsets = freqItemsetBV.value(superset.size - 1)
       val complements = mutable.ListBuffer.empty[(Set[Int], Int, Double)]
       val targets = mutable.HashSet.empty[Set[Int]]
@@ -154,9 +141,6 @@ class AssociationRules(
         }
         i += 1
       }
-
-      //println("==== Use Time " + (System.currentTimeMillis() - time) + " " + supersets)
-
       complements.toList
     }.groupBy(_._1.size).collectAsMap()
 
