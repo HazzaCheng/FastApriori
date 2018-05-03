@@ -11,7 +11,8 @@ FastApriori is an efficient and fast association rules recommendation algorithm 
 
 # Compile
 
-FastApriori is built using Apache Maven. To build FastApriori, Run mvn scala:compile compile package in the root directory.
+FastApriori is built using Apache Maven.
+To build FastApriori, Run `mvn scala:compile compile package` in the root directory.
 
 # Run
 
@@ -21,6 +22,7 @@ Run FastApriori with the following command:
 ```
     spark-submit \
         -v \
+        --master [SPARK_MASTER_ADDRESS] \
         --name "FastApriori" \
         --class "com.hazzacheng.AR.Main" \
         --executor-cores 4 \
