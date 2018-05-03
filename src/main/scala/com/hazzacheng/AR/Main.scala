@@ -9,15 +9,15 @@ package com.hazzacheng.AR
   * Date: 2017-09-26
   * Time: 10:04 PM
   */
+import org.apache.spark.mllib.fpm.FPGrowth
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
   def main(args: Array[String]) {
     val conf = new SparkConf()
-      .set("spark.default.parallelism", "300")
+      .set("spark.default.parallelism", "500")
       .set("spark.speculation", "true")
       .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    conf.getAll.foreach(x => println("==== " + x))
 
     val sc = new SparkContext(conf)
     val minSupport = 0.092
@@ -36,5 +36,7 @@ object Main {
     Utils.saveRecommends(sc, output, recommends)
     println("==== Total time for get recommends " + (System.currentTimeMillis() - time2))
   }
+
+  FPGrowth
 }
 

@@ -69,7 +69,7 @@ class AssociationRules(
                           freqItemsSize: Int
                          ): Array[(Int, String)] = {
     val grouped = freqItemset.groupBy(_._1.size)
-    val rules1 = genRules(sc, grouped)//.sortWith(associationRulesSort).map(x => (x._1, x._2, x._1.size))
+    val rules1 = genRules(sc, grouped)
     val time = System.currentTimeMillis()
     val rules = rules1.sortWith(associationRulesSort).map(x => (x._1, x._2, x._1.size))
     println("==== Size association rules " + rules.length)
